@@ -1,0 +1,3899 @@
+/*
+ * ElegantFin-Werkstatt (CSS), Stand 23.10.2026
+ * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
+ * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
+ */
+/* ===== Akzentfarbe #f97316 ===== */
+/* Akzentfarbe #f97316: setzt alle ElegantFin-Variablen, die von der Akzentfarbe abhängen.
+   Die abgeleiteten Töne (heller fürs Überfahren, dunkler für Bestätigen-Knöpfe) sind aus #f97316 errechnet. */
+:root {
+    --accentColor: #f97316;
+    --accentHoverColor: hsl(24.6, 84.5%, 57.1%);
+    --btnSubmitColor: hsl(24.6, 67.4%, 36.1%);
+    --btnSubmitBorderColor: hsl(24.6, 84.5%, 57.1%);
+    --checkboxCheckedBgColor: hsl(24.6, 95%, 50.1%);
+    --highlightOutlineColor: hsl(24.6, 100%, 44.1%);
+    --accentTextColor: #fff;
+}
+
+/* Die helle Variante von ElegantFin setzt dieselben Variablen mit höherer Spezifität neu */
+:root[data-theme="light"] {
+    --accentColor: hsl(24.6, 97.8%, 48.1%);
+    --accentHoverColor: hsl(24.6, 100%, 55.1%);
+    --btnSubmitColor: hsl(24.6, 72.4%, 45.1%);
+    --btnSubmitBorderColor: hsl(24.6, 84.1%, 57.1%);
+    --checkboxCheckedBgColor: hsl(24.6, 100%, 56.1%);
+    --highlightOutlineColor: hsl(24.6, 100%, 51.1%);
+    --accentTextColor: #fff;
+}
+
+/* Fest verdrahtet in ElegantFin: Zähler (ungesehene Folgen), Sync- und Versionsanzeige in Blau */
+.countIndicator,
+.fullSyncIndicator,
+.mediaSourceIndicator {
+    background: hsl(24.6, 91.2%, 34.1%);
+}
+
+/* ===== Korrekturen, Wünsche und Vorschläge ===== */
+
+/* einheitliche-bausteine: Gleiche Bausteine sehen überall gleich aus */
+/* Einheitliche Bausteine. Erst die gemeinsamen Werte, dann je Bausteinart die Regeln.
+   Die Variablen sind die Schnittstelle zu tweaks-player.js (dort mit var(--…, Ersatzwert)). */
+:root {
+    /* Schieberegler und Fortschrittsbalken */
+    --wsTrackHeight: 0.4em;
+    --wsTrackHeightActive: 0.6em;
+    --wsTrackRadius: 999px;
+    --wsTrackColor: hsla(0, 0%, 100%, 0.18);
+    --wsBufferColor: hsla(0, 0%, 100%, 0.36);
+    --wsFillColor: var(--accentColor);
+    /* Zeitleiste der Musikleiste (und der Leisten „Weiterhören“ und große Ansicht): so weit über
+       der Oberkante, dass der Kreis das kleine Cover nicht berührt (Wunsch vom 23.10.2026: „Der Balken
+       soll da bitte allgemein höher, überall wo man den Miniplayer sieht“) */
+    --wsBarTrackLift: 0.35em;
+
+    /* Griff der Regler: ganzer Kreis in Akzentfarbe (Wunsch: „Der Kreis ist größer als die Bar,
+       deswegen kann der da auch in der Akzentfarbe bleiben.“). Er hebt sich durch seine Größe vom
+       Balken ab, ein dezenter dunkler Schatten trägt ihn auf hellem Bild. Der Ring bleibt als
+       Variable (für tweaks-player.js), hat aber dieselbe Farbe. */
+    --wsThumbSize: 0.95em;
+    --wsThumbColor: var(--accentColor);
+    --wsThumbRing: var(--accentColor);
+    --wsThumbRingWidth: 0.16em;
+    --wsThumbShadow: 0 0.05em 0.3em hsla(0, 0%, 0%, 0.4);
+
+    /* Runde Symbolknöpfe beim Überfahren */
+    --wsIconHoverBg: #fff;
+    --wsIconHoverColor: #000;
+
+    /* Menüs, Dialoge, Meldungen, aufklappende Bereiche */
+    --wsMenuBg: var(--drawerColor);
+    --wsMenuBorder: var(--defaultBorder);
+    --wsMenuRadius: var(--largeRadius);
+    --wsMenuShadow: 0 0.5em 2em hsla(0, 0%, 0%, 0.45);
+    /* Handy: Abstand zu den Rändern für Einblendungen (Meldung, Menüs) */
+    --wsSheetGap: 0.75em;
+
+    /* Abstand zwischen Abschnittsüberschrift und Karten bzw. Liste darunter */
+    --wsSectionTitleGap: 1.2rem;
+
+    /* Tastaturfokus: schmaler dunkler Spalt, dann Ring in Akzentfarbe */
+    --wsFocusRing: 0 0 0 0.12em var(--darkerGradientPoint), 0 0 0 0.26em var(--accentColor);
+}
+
+/* ---------- Schieberegler (G3 Einstellungen, E1 Zeitleiste und Lautstärke, E7 Musikleiste, E8 Wiedergabeseite)
+   ElegantFin: Balken --thumb (0.4em) hoch, leerer und gepufferter Teil gleich grau
+   (--osdSeekBarBufferedColorAlpha), Füllung Textfarbe, Griff so groß wie der Balken und beim
+   Überfahren ein schmaler Strich; --thumb gibt es nur unter .sliderContainer, der Regler der
+   Wiedergabeseite (.nowPlayingPositionSliderContainer) hat ihn nicht. Jellyfin: Griff 1.08em in Blau.
+   Jetzt für jeden .mdl-slider-container gleich. Der Griff ist wirklich --wsThumbSize groß; damit seine
+   Mitte genau am Ende der Füllung sitzt, rücken Balken, Blasenspur und Kapitelmarken um die halbe
+   Griffbreite ein (so rechnet auch Jellyfin: 0.54em bei 1.08em). Spezifität :root + drei Klassen
+   und !important bei Breite und Höhe, weil ElegantFins Hover-/Fokusregeln und Jellyfins
+   .nowPlayingBarPositionSlider (1.2em !important) sonst gewinnen. Gedrehte Regler (aufgeklappte
+   Lautstärke im Player) drehen den Kreis einfach mit. */
+:root,
+:root[data-theme="light"] {
+    --osdSeekBarPlayedColor: var(--wsFillColor);
+    --osdSeekBarThumbColor: var(--wsThumbColor);
+}
+
+.mdl-slider-container {
+    --thumb: var(--wsTrackHeight);
+}
+
+.mdl-slider-container > .mdl-slider-background-flex-container {
+    padding: 0 calc(var(--wsThumbSize) / 2);
+}
+
+.mdl-slider-container > .sliderBubbleTrack,
+.mdl-slider-container > .sliderMarkerContainer {
+    margin: 0 calc(var(--wsThumbSize) / 2);
+}
+
+.mdl-slider-container .mdl-slider-background-flex {
+    height: var(--wsTrackHeight);
+    margin-top: calc(var(--wsTrackHeight) / -2);
+    border-radius: var(--wsTrackRadius);
+    background: var(--wsTrackColor);
+    transition: height 0.15s ease, margin-top 0.15s ease;
+}
+
+.mdl-slider-container:is(:hover, :active, :focus-within) .mdl-slider-background-flex {
+    height: var(--wsTrackHeightActive);
+    margin-top: calc(var(--wsTrackHeightActive) / -2);
+}
+
+.mdl-slider-container .mdl-slider-background-upper {
+    background-color: var(--wsBufferColor);
+}
+
+.mdl-slider-container .mdl-slider-background-lower:not(.mdl-slider-background-lower-clear),
+.mdl-slider-container .sliderMarker.watched {
+    background-color: var(--wsFillColor);
+}
+
+.mdl-slider {
+    color: var(--wsFillColor);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider::-webkit-slider-thumb,
+:root .mdl-slider.mdl-slider.mdl-slider:hover::-webkit-slider-thumb,
+:root .mdl-slider.mdl-slider.mdl-slider:focus::-webkit-slider-thumb {
+    box-sizing: border-box;
+    width: var(--wsThumbSize) !important;
+    height: var(--wsThumbSize) !important;
+    border: var(--wsThumbRingWidth) solid var(--wsThumbRing);
+    border-radius: 50%;
+    background: var(--wsThumbColor);
+    box-shadow: var(--wsThumbShadow);
+    transform: none;
+    transition: transform 0.15s ease;
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider::-moz-range-thumb,
+:root .mdl-slider.mdl-slider.mdl-slider:hover::-moz-range-thumb,
+:root .mdl-slider.mdl-slider.mdl-slider:focus::-moz-range-thumb {
+    box-sizing: border-box;
+    width: var(--wsThumbSize) !important;
+    height: var(--wsThumbSize) !important;
+    border: var(--wsThumbRingWidth) solid var(--wsThumbRing);
+    border-radius: 50%;
+    background: var(--wsThumbColor);
+    box-shadow: var(--wsThumbShadow);
+    transform: none;
+    transition: transform 0.15s ease;
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider:hover::-webkit-slider-thumb {
+    transform: scale(1.12);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider:hover::-moz-range-thumb {
+    transform: scale(1.12);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider.mdl-slider:active::-webkit-slider-thumb {
+    transform: scale(1.3);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider.mdl-slider:active::-moz-range-thumb {
+    transform: scale(1.3);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: var(--wsThumbShadow), var(--wsFocusRing);
+}
+
+:root .mdl-slider.mdl-slider.mdl-slider:focus-visible::-moz-range-thumb {
+    box-shadow: var(--wsThumbShadow), var(--wsFocusRing);
+}
+
+/* ---------- Fortschrittsbalken auf Karten und in Listen (B2, D2): wie der Reglerbalken.
+   ElegantFin: 0.35em, grau hinterlegt (!important), Füllung Textfarbe zu 75 %, rechts gerundet. */
+.itemProgressBar:not(.backgroundProgress):not(.playbackProgress):not(.transcodingProgress) {
+    height: var(--wsTrackHeight);
+    border-radius: var(--wsTrackRadius);
+    background-color: var(--wsTrackColor) !important;
+}
+
+.itemProgressBar:not(.backgroundProgress):not(.playbackProgress):not(.transcodingProgress) > .itemProgressBarForeground {
+    border-radius: var(--wsTrackRadius);
+    background-color: var(--wsFillColor);
+    opacity: 1;
+}
+
+/* ---------- Runde Symbolknöpfe: beim Überfahren weiß mit schwarzem Symbol.
+   ElegantFin nimmt dafür --hoverBackgroundColor (Textfarbe, also hellgrau) bei .paper-icon-button-light
+   (Kopfzeile, ⋮ auf Karten, Listenknöpfe, Werkzeugleiste C1, Scrollknöpfe, Dialog-Zurück, Player)
+   und den runden Knöpfen der Detailseite, --hoverTabBackgroundColor (90 % Weiß) bei den Reitern.
+   Die Symbolfarbe ist dort --zeroContrastColor, in der dunklen Fassung schon Schwarz (= --wsIconHoverColor). Die helle Variante
+   setzt eigene Werte (Akzentfarbe) und bleibt so. Die grünen Abspielknöpfe überschreiben das mit
+   !important und bleiben grün. */
+:root:not([data-theme="light"]) {
+    --hoverBackgroundColor: var(--wsIconHoverBg);
+    --hoverTabBackgroundColor: var(--wsIconHoverBg);
+}
+
+/* Buchstaben-Springer: ElegantFin färbt beim Überfahren nur die Schrift */
+@media (hover: hover) and (pointer: fine) {
+    .alphaPicker .alphaPickerButton:not(.alphaPickerButton-selected):hover {
+        background-color: var(--wsIconHoverBg);
+        color: var(--wsIconHoverColor);
+    }
+}
+
+/* Tastaturfokus: überall derselbe Ring (ElegantFin färbt bei .show-focus zusätzlich die Fläche) */
+.paper-icon-button-light:focus-visible,
+.detailButton:focus-visible,
+.emby-tab-button:focus-visible,
+.alphaPickerButton:focus-visible,
+.emby-button.raised:focus-visible,
+.button-submit:focus-visible {
+    outline: none;
+    box-shadow: var(--wsFocusRing);
+}
+
+/* ---------- Gesehen und Anzahl (B4, C1, D2, D3): gleich groß.
+   Jellyfin: .playedIndicator 80 %, .countIndicator 88 % Schrift, bei 2em Kreis also verschieden groß.
+   Rand und Kreisform sind bei beiden schon gleich (.indicator, ElegantFin --defaultLighterBorder). */
+.indicator.playedIndicator,
+.indicator.countIndicator {
+    font-size: 80%;
+    border: var(--defaultLighterBorder);
+}
+
+/* Anzahl ungesehener Folgen (Wunsch: „Folgenanzahl Hintergrund grün“): im Grün und mit dem Rand der
+   Abspielknöpfe, weiße Zahl. Vorher ein Blau bzw. ein Ton der Akzentfarbe (siehe Akzentfarbe).
+   Die Versionsanzeige (.mediaSourceIndicator, oben links) sieht gleich aus, bedeutet aber etwas
+   anderes und bleibt deshalb im Akzentton. */
+.indicator.countIndicator,
+.indicator.playedIndicator {
+    background: var(--btnMiniPlayColor);
+    border: var(--borderWidth) solid var(--btnMiniPlayBorderColor);
+    color: #fff;
+}
+
+/* Gesehen überall im selben Grün (Wunsch vom 22.10.2026): ElegantFin nimmt für den Haken auf dem
+   Cover und das gesehene Haken-Symbol ein helleres Grün (rgb(34, 197, 94)). */
+.playstatebutton-icon-played {
+    color: var(--btnMiniPlayBorderColor);
+}
+
+.layout-mobile .indicator.playedIndicator,
+.layout-mobile .indicator.countIndicator {
+    font-size: 70%;
+}
+
+/* ---------- Häkchen, Optionsfelder, Schalter (G3, F2): gewählt heißt Akzentfläche mit hellem Zeichen.
+   Der Schaltergriff bleibt weiß: auf der Akzentspur wäre ein Griff in Akzentfarbe nicht zu sehen.
+   ElegantFin: Häkchen in --checkboxCheckedBgColor (etwas dunkler als der Akzent), Optionsfelder und
+   Schalter lässt es bei Jellyfin (Textfarbe bzw. #00a4dc). */
+.emby-checkbox:checked + span + .checkboxOutline:not(.multiSelectCheckboxOutline) {
+    background: var(--accentColor);
+    border: var(--borderWidth) solid var(--accentColor);
+}
+
+.emby-checkbox:checked + span + .checkboxOutline:not(.multiSelectCheckboxOutline) .checkboxIcon-checked {
+    color: var(--accentTextColor, #fff);
+}
+
+.emby-checkbox:focus-visible + span + .checkboxOutline {
+    outline: none;
+    box-shadow: var(--wsFocusRing);
+}
+
+.mdl-radio__button:checked + .mdl-radio__circles .mdl-radio__outer-circle,
+.mdl-radio__button:checked + .mdl-radio__circles .mdl-radio__inner-circle {
+    color: var(--accentColor);
+}
+
+.mdl-radio__button:focus-visible + .mdl-radio__circles {
+    border-radius: 50%;
+    box-shadow: var(--wsFocusRing);
+}
+
+.mdl-switch__track {
+    background: var(--wsTrackColor);
+}
+
+.mdl-switch__thumb {
+    background: hsl(0, 0%, 78%);
+}
+
+.mdl-switch__input:checked + .mdl-switch__label + .mdl-switch__trackContainer > .mdl-switch__track {
+    background: var(--accentColor);
+}
+
+.mdl-switch__input:checked + .mdl-switch__label + .mdl-switch__trackContainer > .mdl-switch__thumb {
+    background: #fff;
+    box-shadow: var(--wsThumbShadow);
+}
+
+.mdl-switch__input:checked:focus + .mdl-switch__label + .mdl-switch__trackContainer .mdl-switch__focus-helper {
+    background-color: transparent;
+    box-shadow: var(--wsFocusRing);
+}
+
+/* ---------- Menüs, Dialoge, Meldungen (F1 Kontextmenü, F2 Formular, F3 Meldung, E2/E3 Player-Menüs,
+   E5 „Als Nächstes“): gleiche Fläche, Ecke, Rand, Schatten.
+   ElegantFin: Dialoge --drawerColor mit großem Radius, Meldung und „Als Nächstes“ --headerColor
+   (!important), Meldung mit kleinem Radius; Dialoge fester Größe ohne Rand und Ecken.
+   Am Rechner bekommen auch Dialoge fester Größe die Ecken, ganz bildschirmfüllende bleiben eckig. */
+.layout-desktop .dialog:not(.dialog-fullscreen):not(.dialog-fullscreen-lowres),
+.layout-mobile .dialog:not(.dialog-fullscreen):not(.dialog-fullscreen-lowres):not(.dialog-fixedSize),
+.toastContainer > .toast,
+.upNextContainer.upNextContainer {
+    background: var(--wsMenuBg) !important;
+    border: var(--wsMenuBorder) !important;
+    border-radius: var(--wsMenuRadius) !important;
+    box-shadow: var(--wsMenuShadow);
+    -webkit-backdrop-filter: var(--blurDefault);
+    backdrop-filter: var(--blurDefault);
+}
+
+/* ---------- Eingabefelder und Auswahllisten (G2, F2, D1 Spurauswahl): gleicher Fokus.
+   Fläche, Rand und Ecke sind bei ElegantFin schon gleich; beim Fokus setzt es Rahmen und
+   outline in --highlightOutlineColor (!important). Jetzt: Rahmen in Akzentfarbe plus Fokusring. */
+.emby-input.emby-input:focus,
+.emby-select-withcolor.emby-select-withcolor:focus,
+.emby-textarea.emby-textarea:focus {
+    border-color: var(--accentColor) !important;
+    outline: none !important;
+    box-shadow: var(--wsFocusRing);
+}
+
+/* ---------- Textlinks (D1 Genres/Regie, E8 Album/Interpret, Einstellungen): eine Farbe, ein Hover.
+   ElegantFin: --dimTextColor, beim Überfahren Textfarbe ohne Unterstrich. Die Link-Pillen der
+   Detailseite (.itemExternalLinks) behalten ihre Pillenform und Akzentfläche. */
+.button-link {
+    color: var(--textColor);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .button-link:hover {
+        color: var(--fullContrastColor) !important;
+        text-decoration: underline;
+    }
+
+    .itemExternalLinks > .button-link:hover {
+        text-decoration: none;
+    }
+}
+
+/* ---------- Aktive Zustände (A1/C1 Reiter, C1 Buchstabe, A2 Menüeintrag, Menüs): Akzentfläche.
+   ElegantFin: aktiver Reiter hellgrau (--btnPlayColor) mit dunkler Schrift, markierter Buchstabe
+   ebenso, Menüeintrag und gewählter Menüpunkt schon in Akzentfarbe. */
+.sectionTabs .emby-tab-button.emby-tab-button-active,
+.sectionTabs .emby-tab-button.emby-tab-button-active:hover {
+    background-color: var(--accentColor);
+    color: var(--accentTextColor, #fff);
+}
+
+.alphaPickerButton.alphaPickerButton-selected {
+    background-color: var(--accentColor);
+    color: var(--accentTextColor, #fff) !important;
+}
+
+.navMenuOption-selected,
+.navMenuOption-selected .navMenuOptionIcon,
+.navMenuOption-selected .navMenuOptionText {
+    color: var(--accentTextColor, #fff);
+}
+
+/* ---------- Abschnittsüberschrift über Karten oder Liste (B1 bis B6, D1 Ähnliche, D3 Besetzung und
+   Staffeln, D2 Staffel über der Folgenliste, Bibliotheken): überall derselbe, größere Abstand.
+   Bisher: Behälter .sectionTitleContainer-cards 0.2em unten (ElegantFin); mit Link
+   (.sectionTitleTextButton) kommt im Titel 0.3em Innenabstand dazu (bei 1.5rem Schrift 0.45rem);
+   Überschriften direkt im Abschnitt (Detailseite) haben 0.2em unten (Jellyfin). Jetzt ergibt jede
+   Variante --wsSectionTitleGap bis zur Kartenreihe. Die Scrollknöpfe hängen absolut oben am
+   Abschnitt und bleiben so auf Höhe der Überschrift. */
+.sectionTitleContainer.sectionTitleContainer-cards {
+    padding-bottom: var(--wsSectionTitleGap);
+}
+
+.sectionTitleContainer.sectionTitleContainer-cards:has(> .sectionTitleTextButton) {
+    padding-bottom: calc(var(--wsSectionTitleGap) - 0.45rem);
+}
+
+div:not(.sectionTitleContainer-cards) > .sectionTitle.sectionTitle-cards {
+    padding-bottom: var(--wsSectionTitleGap);
+}
+
+/* ========== Handy (nur .layout-mobile, am Rechner ändert sich nichts) ========== */
+
+/* ---------- Knöpfe am Handy: kein Umfärben bei :hover, :focus und :active, siehe Schalter
+   „Handy: Knöpfe färben sich beim Antippen nicht um“ (steht am Ende, damit er auch die Regeln
+   der übrigen Schalter überstimmt). */
+
+/* ---------- Meldung am Handy (F3, Wunsch: „Kleiner und nach oben.“): oben unter der Kopfzeile und der
+   Safe-Area, mittig, nur so breit wie der Text, etwas kleinere Schrift und weniger Innenabstand
+   als bei Jellyfin (Nachtrag: „Ein bisschen größer.“, deshalb 100 % statt 110 %),
+   --wsSheetGap zu den Rändern. Jellyfin: links unten, mindestens 20em breit, 110 % Schrift,
+   kommt von unten herein (translateY(16em)); hier kommt sie von oben. Ecke, Fläche, Rand und
+   Schatten kommen aus den Menü-Variablen oben. */
+.layout-mobile .toastContainer {
+    top: calc(var(--appBarHeight) + var(--wsSheetGap));
+    top: calc(max(env(safe-area-inset-top), 0px) + var(--appBarHeight) + var(--wsSheetGap));
+    right: 0;
+    bottom: auto;
+    left: 0;
+    align-items: center;
+    padding: 0 var(--wsSheetGap);
+}
+
+.layout-mobile .toastContainer > .toast {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 0.35em;
+    padding: 0.75em 1.35em;
+    font-size: 100%;
+    text-align: center;
+}
+
+.layout-mobile .toastContainer > .toast:last-child:not(.toastVisible) {
+    transform: translateY(-8em);
+}
+
+/* ---------- Folgenliste am Handy (D2, Wunsch: „Buttons so wie C2, bereits abgespielt Balken nach unten
+   ins Cover“): Knopfgruppe rechts mit derselben Größe und demselben Abstand wie in der Liste C2
+   (Gruppe 0.65em, Knöpfe 2.4em, Abstand 0.3em, senkrecht gestapelt wie bei ElegantFin). Der
+   Abspielknopf bleibt unten links im Bild. Den Gesehen-Ring statt des Hakens setzt der Schalter
+   „Listen: Gesehen-Status am Haken-Knopf“. */
+.layout-mobile .listItem-largeImage .listViewUserDataButtons {
+    font-size: 0.65em;
+    gap: 0.3em;
+}
+
+.layout-mobile .listItem-largeImage .listViewUserDataButtons > .listItemButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4em;
+    height: 2.4em;
+    margin: 0;
+    padding: 0;
+}
+
+/* Fortschritt der angefangenen Folge: an der Unterkante innen, wie auf den Weiterschauen-Karten.
+   ElegantFin: absolut ohne Lage, Rand 8 % bzw. unten 5 %, Breite 100 % - 2em, mittig. */
+.layout-mobile .listItem-largeImage .listItemImage-large > .itemProgressBar:not(.backgroundProgress):not(.playbackProgress):not(.transcodingProgress) {
+    position: absolute;
+    top: auto;
+    right: 0.4em;
+    bottom: 0.4em;
+    left: 0.4em;
+    width: auto;
+    margin: 0;
+    justify-self: auto;
+    z-index: 1;
+}
+
+/* ---------- Kontextmenü am Handy (F1): wie das Einstellungsmenü im Player (E2) als Einblendung von
+   unten über die ganze Breite, abgerundet, links, rechts und unten --wsSheetGap Abstand, oben
+   bleibt Jellyfins Höchsthöhe (90 %). Die Player-Menüs (Seite mit .videoPlayerContainer) regelt
+   tweaks-player.js, deshalb hier ausgenommen. !important, weil Jellyfin die Lage per style setzt. */
+:root.layout-mobile:not(:has(.videoPlayerContainer)) .dialogContainer > .actionSheet.actionsheet-not-fullscreen {
+    position: fixed !important;
+    top: auto !important;
+    right: var(--wsSheetGap) !important;
+    bottom: max(env(safe-area-inset-bottom), var(--wsSheetGap)) !important;
+    left: var(--wsSheetGap) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 90%;
+    margin: 0 !important;
+}
+
+/* fix-hover-ecken: Ecken beim Überfahren des Abspielknopfs */
+/* Abspielknopf auf Karten: Unschärfe sauber abrunden.
+   Ursache: ElegantFin setzt beim Überfahren eines Knopfs backdrop-filter auf .cardOverlayContainer.
+   Chromium schneidet einen backdrop-filter nicht an border-radius plus overflow: hidden des
+   Elternelements (.cardScalable) ab, sondern nur rechteckig; die scale-Transformationen beim
+   Hover machen die Ecken zusätzlich sichtbar. clip-path an .cardScalable würde helfen, schneidet
+   aber auch dessen Schatten weg. Ein Element begrenzt seinen backdrop-filter dagegen immer an
+   seinem EIGENEN border-radius. Darum übernimmt das Overlay den Radius der Karte. */
+.cardScalable > .cardOverlayContainer {
+    border-radius: inherit;
+}
+
+/* „inherit“ übernimmt auch Prozentwerte, runde Personenkarten (border-radius: 50%) bleiben also rund.
+   Zur Sicherheit noch einmal ausdrücklich, falls Jellyfin dort andere Klassen setzt. */
+#castCollapsible .cardScalable > .cardOverlayContainer,
+#guestCastContent .cardScalable > .cardOverlayContainer {
+    border-radius: 50%;
+}
+
+/* Karten mit Rahmen (visualCardBox): .cardScalable ist dort eckig, die Rundung sitzt am
+   äußeren Kasten. Das Overlay bekommt oben dessen inneren Radius, unten bleibt es gerade. */
+.visualCardBox .cardScalable > .cardOverlayContainer {
+    border-radius: calc(var(--largeRadius) - var(--borderWidthDouble)) calc(var(--largeRadius) - var(--borderWidthDouble)) 0 0;
+}
+
+.layout-mobile .visualCardBox .cardScalable > .cardOverlayContainer {
+    border-radius: calc(var(--largeRadius) - var(--borderWidth)) calc(var(--largeRadius) - var(--borderWidth)) 0 0;
+}
+
+/* fix-titel-statt-fragezeichen: Titel statt „?“ bei fehlendem Bild */
+/* Ohne Bild den Titel zeigen statt „?“.
+   Fall 1, Text: Jellyfin schreibt den Namen als .cardDefaultText. ElegantFin färbt ihn
+   durchsichtig und setzt ein „?“ davor. Beides wird zurückgenommen. */
+.cardImageContainer > .cardDefaultText {
+    color: var(--textColor);
+    font-size: 1.05em;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: auto;
+    padding: 0 0.75em;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    text-shadow: var(--shadow);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+}
+
+.cardImageContainer > .cardDefaultText::before {
+    content: none;
+}
+
+/* Fall 2, Symbol: Für Filme, Serien, Alben, Interpreten, Ordner usw. gibt Jellyfin statt
+   Text nur <span class="cardImageIcon material-icons …"> aus (getDefaultText im cardBuilder).
+   Den Namen trägt aber der Bild-Container als aria-label (außer im TV-Layout).
+   Das Symbol wird klein, darunter steht der Titel. */
+.cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon) {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3em;
+}
+
+.cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon) > .cardImageIcon {
+    margin: 0;
+    font-size: 2.4em;
+    opacity: 0.8;
+}
+
+.cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after {
+    content: attr(aria-label);
+    color: var(--textColor);
+    font-size: 1.05em;
+    font-weight: 600;
+    line-height: 1.25;
+    padding: 0 0.75em;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    text-shadow: var(--shadow);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+}
+
+/* Breite, niedrige Karten (Weiterschauen, Bibliotheken): höchstens zwei Zeilen */
+.backdropCard .cardImageContainer > .cardDefaultText,
+.overflowBackdropCard .cardImageContainer > .cardDefaultText,
+.backdropCard .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after,
+.overflowBackdropCard .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after {
+    -webkit-line-clamp: 2;
+}
+
+/* Runde Personenkarten: Text weiter nach innen, damit er nicht am Kreisrand klebt */
+#castCollapsible .cardImageContainer > .cardDefaultText,
+#guestCastContent .cardImageContainer > .cardDefaultText,
+#castCollapsible .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after,
+#guestCastContent .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after {
+    padding: 0 16%;
+    -webkit-line-clamp: 3;
+}
+
+/* Handy: kleinere Karten, also kleinere Schrift */
+.layout-mobile .cardImageContainer > .cardDefaultText,
+.layout-mobile .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon)::after {
+    font-size: 0.9em;
+    padding: 0 0.5em;
+}
+
+.layout-mobile .cardImageContainer.defaultCardBackground[aria-label]:has(> .cardImageIcon) > .cardImageIcon {
+    font-size: 2em;
+}
+
+/* Listen: Jellyfin setzt dort bei fehlendem Bild ebenfalls .cardDefaultText ein (ohne aria-label,
+   der Titel steht ohnehin daneben). Kleines Listenbild: kleine Schrift, großes Folgenbild: normal. */
+.listItemImage.cardImageContainer > .cardDefaultText {
+    font-size: 0.62em;
+    line-height: 1.15;
+    padding: 0 0.25em;
+    text-shadow: none;
+    -webkit-line-clamp: 3;
+}
+
+.listItemImage-large.cardImageContainer > .cardDefaultText {
+    font-size: 1em;
+    line-height: 1.25;
+    padding: 0 0.75em;
+}
+
+/* ohne-loeschen: Kein „Medien löschen“ in Jellyfin */
+/* Kein Löschen von Medien in der Oberfläche (zweite Sicherung, das Schloss ist das Benutzerrecht).
+   Wo jellyfin-web 10.11.11 Medien löschen anbietet (deleteHelper.deleteItem bzw. apiClient.deleteItem):
+     components/itemContextMenu.js   Eintrag id "delete" („Medien löschen“ usw., getDeleteLabel), nur bei
+                                     item.CanDelete; derselbe Baustein für ⋮ auf Karten und Listen, „Mehr“ auf
+                                     der Detailseite und in der Wiedergabe-Ansicht
+     components/multiSelect/multiSelect.js  Eintrag id "delete" im Menü der Mehrfachauswahl
+                                     (die Leiste selbst hat keinen Löschknopf, nur ⋮)
+   Beide sind actionSheets; jeder Eintrag ist .actionSheetMenuItem mit data-id (actionSheet.ts).
+   Dieselbe id "delete" benutzen aber auch Menüs, die keine Medien löschen: Bild-Editor (mit
+   moveleft/moveright/search), Benutzerliste im Dashboard (access/parentalcontrol/open), Serverauswahl
+   (connect) und Bibliotheken (rename/edit/editimages/refresh). Deshalb greift die Regel nur in
+   Menüs, die einen der Einträge des Medien-Kontextmenüs bzw. der Mehrfachauswahl enthalten, und nicht,
+   wenn „rename“ dabei ist (Bibliotheksmenü). Ein Bild-Menü, das nur „Löschen“ enthält, bleibt also.
+   Trennlinien (.actionsheetDivider): itemContextMenu setzt eine direkt nach dem Löschen-Block. Stand
+   „Löschen“ allein zwischen zwei Trennlinien oder ganz oben, fällt die überzählige Linie mit weg. */
+:where(.actionSheet:has(.actionSheetMenuItem:is(
+    [data-id="resume"], [data-id="playallfromhere"], [data-id="queue"], [data-id="queuenext"],
+    [data-id="shuffle"], [data-id="instantmix"], [data-id="multiSelect"],
+    [data-id="addtocollection"], [data-id="addtoplaylist"], [data-id="playlist"],
+    [data-id="download"], [data-id="downloadall"], [data-id="copy-stream"],
+    [data-id="editplaylist"], [data-id="edit"], [data-id="editimages"],
+    [data-id="editsubtitles"], [data-id="editlyrics"], [data-id="identify"],
+    [data-id="moremediainfo"], [data-id="refresh"], [data-id="removefromplaylist"],
+    [data-id="removefromcollection"], [data-id="share"], [data-id="album"], [data-id="artist"],
+    [data-id="lyrics"], [data-id="record"], [data-id="markplayed"], [data-id="markunplayed"],
+    [data-id="selectall"], [data-id="groupvideos"]
+)):not(:has(.actionSheetMenuItem[data-id="rename"]))) .actionSheetMenuItem[data-id="delete"] {
+    display: none !important;
+}
+
+:where(.actionSheet:has(.actionSheetMenuItem:is(
+    [data-id="resume"], [data-id="playallfromhere"], [data-id="queue"], [data-id="queuenext"],
+    [data-id="shuffle"], [data-id="instantmix"], [data-id="multiSelect"],
+    [data-id="addtocollection"], [data-id="addtoplaylist"], [data-id="playlist"],
+    [data-id="download"], [data-id="downloadall"], [data-id="copy-stream"],
+    [data-id="editplaylist"], [data-id="edit"], [data-id="editimages"],
+    [data-id="editsubtitles"], [data-id="editlyrics"], [data-id="identify"],
+    [data-id="moremediainfo"], [data-id="refresh"], [data-id="removefromplaylist"],
+    [data-id="removefromcollection"], [data-id="share"], [data-id="album"], [data-id="artist"],
+    [data-id="lyrics"], [data-id="record"], [data-id="markplayed"], [data-id="markunplayed"],
+    [data-id="selectall"], [data-id="groupvideos"]
+)):not(:has(.actionSheetMenuItem[data-id="rename"]))) :is(
+    .actionsheetDivider:has(+ .actionSheetMenuItem[data-id="delete"] + .actionsheetDivider),
+    .actionSheetMenuItem[data-id="delete"]:first-child + .actionsheetDivider,
+    .actionsheetDivider:has(+ .actionSheetMenuItem[data-id="delete"]:last-child)
+) {
+    display: none !important;
+}
+
+/* ohne-stream-link: Kein „Link zum Stream kopieren“ */
+/* „Link zum Stream kopieren“ (itemContextMenu.js, id "copy-stream": apiClient.getItemDownloadUrl,
+   der Link enthält den api_key des Benutzers). Die id kommt nur in diesem Menü vor. */
+.actionSheetMenuItem[data-id="copy-stream"] {
+    display: none !important;
+}
+
+/* einheitliche-playbuttons: Abspielknöpfe überall gleich */
+/* Einheitliche Abspielknöpfe auf Karten, in Listen und auf der Detailseite.
+   Bestand in ElegantFin:
+     .cardOverlayFab-primary (Karten), .listItemImageButton (Listen), mobiles Overlay
+       .cardOverlayButton-br: grün (--btnMiniPlayColor), Hover auf Karten scale(1.4)
+     .btnPlay.detailButton (Detailseite): heller Pillenknopf (--btnPlayColor), dunkle Schrift,
+       Hover per brightness(1.1), Symbol nur als Umriss (--fill: 0)
+   Jetzt einheitlich: grüne Fläche (ElegantFins --btnMiniPlayColor, bewusst NICHT die
+   Akzentfarbe), heller Rand, gefülltes Symbol, Schatten, beim Überfahren ein hellerer Grünton
+   und leichtes Vergrößern. Reine Symbolknöpfe sind Kreise, der beschriftete
+   Knopf der Detailseite bleibt eine Pille. Die Größen richten sich nach dem Ort.
+   --btnPlayColor bleibt unangetastet, weil ElegantFin es auch für aktive Reiter und den
+   Buchstaben-Springer nutzt. Die Knöpfe im Player (.btnPause), in der Musikleiste
+   (.playPauseButton) und auf der Wiedergabeseite (.btnPlayPause) fasst dieser Schalter nicht an. */
+:root {
+    --playButtonColor: var(--btnMiniPlayColor);
+    --playButtonHoverColor: rgb(52, 178, 110);
+    --playButtonBorderColor: var(--btnMiniPlayBorderColor);
+    --playButtonIconColor: #fff;
+    --playButtonShadow: 0 0.1em 0.45em hsla(0, 0%, 0%, 0.35);
+}
+
+/* Karten (Desktop), Listen und mobiles Karten-Overlay */
+.cardOverlayContainer > .cardOverlayFab-primary,
+.listItemImageButton,
+.layout-mobile .cardOverlayButton-br:not([data-action="menu"]) > .cardOverlayButtonIcon {
+    --fill: 1;
+    background-color: var(--playButtonColor) !important;
+    color: var(--playButtonIconColor) !important;
+    border: var(--borderWidth) solid var(--playButtonBorderColor) !important;
+    border-radius: 50%;
+    box-shadow: var(--playButtonShadow);
+    text-shadow: none;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.cardOverlayContainer > .cardOverlayFab-primary:hover,
+.listItemImageButton:hover {
+    background-color: var(--playButtonHoverColor) !important;
+    color: var(--playButtonIconColor) !important;
+    transform: scale(1.12);
+}
+
+.layout-mobile .cardOverlayButton-br:not([data-action="menu"]):active > .cardOverlayButtonIcon {
+    background-color: var(--playButtonHoverColor) !important;
+    color: var(--playButtonIconColor) !important;
+}
+
+/* Detailseite: beschrifteter Knopf „Fortsetzen“/„Abspielen“ */
+.btnPlay.detailButton {
+    background-color: var(--playButtonColor);
+    border: var(--borderWidth) solid var(--playButtonBorderColor);
+    color: var(--playButtonIconColor);
+    box-shadow: var(--playButtonShadow);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.btnPlay.detailButton .detailButton-icon {
+    --fill: 1;
+}
+
+.btnPlay.detailButton:active {
+    background-color: var(--playButtonHoverColor);
+    color: var(--playButtonIconColor);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .btnPlay.detailButton:hover {
+        background-color: var(--playButtonHoverColor);
+        color: var(--playButtonIconColor);
+        filter: none;
+        transform: scale(1.04);
+    }
+}
+
+/* buchstaben-waagerecht: Buchstaben-Springer als Reihe über dem Raster */
+/* Buchstaben-Springer waagerecht über dem Raster.
+   Jellyfin baut ihn als .alphaPicker-vertical mit .alphaPicker-fixed (position: fixed am rechten
+   Rand) und hält dafür mit .padded-right-withalphapicker 7,5 % Platz frei. Im DOM steht er schon
+   zwischen Werkzeugleiste und Raster, deshalb genügt es, ihn in den Fluss zurückzuholen.
+   Die Fernseh-Fassung (.alphaPicker-tv) bleibt senkrecht, weil dort die Pfeiltasten-Navigation
+   darauf ausgelegt ist. Selektoren mit zwei Klassen, damit sie sicher über ElegantFins eigenen
+   Regeln für .alphaPicker-vertical liegen. */
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    margin: 0 var(--sidePadding) 0.75em;
+    padding: 0.15em 0;
+    font-size: 1em;
+    line-height: 1;
+    text-align: center;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)::-webkit-scrollbar {
+    display: none;
+}
+
+/* Jellyfin blendet den festen Springer bei sehr niedrigen Fenstern aus; als Reihe stört er dort nicht */
+@media (max-height: 31.25em) {
+    .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv):not(.hide) {
+        display: block !important;
+    }
+}
+
+/* Reihe so breit wie ihr Inhalt und mittig: passt sie nicht, beginnt das Wischen am Anfang statt in der Mitte */
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) > .alphaPickerRow {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+    margin: 0 auto;
+    gap: 0.15em;
+}
+
+/* Jeder Buchstabe ein gleich großer Kreis; padding mit !important, weil Jellyfin es bei
+   .alphaPickerButton-vertical selbst mit !important setzt */
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) .alphaPickerButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    margin: 0;
+    padding: 0 !important;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 0.95em;
+    line-height: 1;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) .alphaPickerButton:hover {
+    background-color: var(--wsIconHoverBg, #fff);
+    color: var(--wsIconHoverColor, #000);
+}
+
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) .alphaPickerButton.alphaPickerButton-selected,
+.alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) .alphaPickerButton.alphaPickerButton-selected:hover {
+    background-color: var(--accentColor);
+    color: var(--accentTextColor, #fff) !important;
+    font-weight: 600;
+}
+
+.layout-mobile .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv) .alphaPickerButton {
+    width: 2.2em;
+    height: 2.2em;
+}
+
+/* Serienbibliothek (Fehler: „Bei Serien ist die Liste mit den Buchstaben unter den Serien.“).
+   In shows/tvrecommended.html steht der Springer im DOM HINTER dem Raster, in movies.html und
+   music.html davor. Solange er fest am Rand klebte, war das egal; im Fluss landet er unter allen
+   Karten (am Handy wie am Rechner). Darum ordnet ein solcher Reiter seine Kinder per Flexbox um:
+   erst die Werkzeugleiste, dann die Buchstaben, dann alles Übrige in der Reihenfolge des DOM
+   (Raster, untere Seitenleiste). Nur wo der Springer wirklich hinter einem Raster steht (:has),
+   Filme, Musik und Ordnerseiten bleiben unberührt. Inaktive Reiter blendet Jellyfin mit
+   display: none !important aus, deshalb nur .is-active. */
+.pageTabContent.is-active:has(> .itemsContainer ~ .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)) {
+    display: flex;
+    flex-direction: column;
+}
+
+.pageTabContent.is-active:has(> .itemsContainer ~ .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)) > * {
+    order: 2;
+}
+
+.pageTabContent.is-active:has(> .itemsContainer ~ .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)) > :first-child {
+    order: 0;
+}
+
+.pageTabContent.is-active:has(> .itemsContainer ~ .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)) > .alphaPicker {
+    order: 1;
+}
+
+/* Fehler „die Serien sind jetzt mittig und fangen nicht mehr links an“: Jellyfin setzt
+   .itemsContainer { margin: 0 auto }. Im Blockfluss werden diese Ränder bei voller Breite zu 0,
+   im Flexbox-Stapel lassen automatische Ränder das Raster dagegen auf Inhaltsbreite schrumpfen
+   und mittig stehen. Mit Rand 0 wird es wie bei Filmen über die ganze Breite gezogen und beginnt links. */
+.pageTabContent.is-active:has(> .itemsContainer ~ .alphaPicker.alphaPicker-vertical:not(.alphaPicker-tv)) > .itemsContainer {
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
+}
+
+/* Den Platz, den Jellyfin rechts fürs senkrechte Alphabet reserviert, wieder freigeben.
+   Elemente mit .padded-right behalten ihren Rand (ElegantFin setzt ihn dort ohnehin per !important). */
+[dir="ltr"] .padded-right-withalphapicker:not(.padded-right) {
+    padding-right: 0;
+}
+
+[dir="rtl"] .padded-right-withalphapicker:not(.padded-left) {
+    padding-left: 0;
+}
+
+/* seitenanzeige-unten-weg: Bibliotheken: Seitenanzeige unten weg */
+/* Untere Seitenanzeige. Jellyfin legt in movies.html, tvrecommended.html, music.html, list.html und
+   livetv.html unter dem Raster eine eigene Zeile an, die nur ein .paging enthält; libraryBrowser.js
+   (getQueryPagingHtml) füllt beide .paging gleich, oben und unten. Die obere steht VOR dem Raster und
+   teilt sich die Zeile mit Ansicht, Sortieren und Filter, sie wird hier also nicht getroffen.
+   Ausgeblendet wird die ganze untere Zeile, damit ihre Innenabstände keine Lücke hinterlassen;
+   den Abstand zum Seitenende hält Jellyfin ohnehin mit padding-bottom: 5em an der Seite frei. */
+.itemsContainer ~ .flex:has(> .paging:only-child) {
+    display: none;
+}
+
+/* ohne-overscroll: Rechner: kein Nachfedern beim Scrollen */
+/* Kein Nachfedern im Rechner-Layout. Jellyfin scrollt Seiten über das Dokument selbst; was am
+   Wurzelelement steht, gilt für den Viewport (body nur zur Sicherheit für ältere Browser).
+   Nur senkrecht, damit das Wischen mit zwei Fingern zum Zurückgehen auf der Seite erhalten bleibt.
+   Waagerechte Reihen (.emby-scroller, .scrollX) nur waagerecht: Senkrechtes Scrollen über einer Reihe
+   läuft so weiter an die Seite durch, am Reihenende federt nichts und es wird auch nicht
+   versehentlich zurückgeblättert. Menüs und Dialoge bleiben unberührt (scrollen normal; Jellyfins
+   .dialogContainer hat schon overscroll-behavior: contain). Am Handy (.layout-mobile) bleibt alles,
+   wie es ist, weil Chrome dort mit derselben Einstellung „Zum Aktualisieren ziehen“ abschalten würde. */
+html.layout-desktop,
+html.layout-desktop > body {
+    overscroll-behavior-y: none;
+}
+
+.layout-desktop .emby-scroller,
+.layout-desktop .scrollX {
+    overscroll-behavior-x: none;
+}
+
+/* liste-playbutton-hinten: Listen: Abspielknopf zu den Knöpfen rechts */
+/* Listen (ohne große Folgenbilder): Abspielknopf aus dem Cover in die Knopfgruppe rechts.
+   Der Knopf steckt im DOM in .listItemImage, das position: relative hat und Haken, Versions-
+   und Fortschrittsanzeige trägt. Mit position: absolute käme er dort nicht heraus. Deshalb:
+   .listItem bekommt contain: layout und wird damit zum Bezugsrahmen für position: fixed,
+   der Knopf wird darin fest an die rechte Seite gesetzt. Die Knöpfe der Gruppe bekommen eine
+   feste Größe, ihre Anzahl wird per :has() gezählt (--listButtonCount), und die Gruppe hält
+   links per padding Platz für den Abspielknopf frei. Zwischen allen Knöpfen liegt derselbe
+   Abstand (0.36em der Zeile, in der Gruppe als gap 0.45em × 0.8), auch zwischen Abspielknopf
+   und erstem Knopf; die Lage des Abspielknopfs rechnet ihn mit. Alle Maße in em der Listenzeile:
+   der Knopf erbt deren Schriftgröße (font-size: 1em, gegen Jellyfins 0.6em !important in
+   schmalen Fenstern), die Gruppe nutzt 0.8em statt ElegantFins fester Größe „small“.
+   0.375em ist ElegantFins Innenabstand der Listenzeile. Ausgelegt für Schrift von links nach rechts. */
+.listItem:not(.listItem-largeImage):has(.listItemImageButton) {
+    contain: layout;
+    --listButtonCount: 0;
+}
+
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(1)) { --listButtonCount: 1; }
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(2)) { --listButtonCount: 2; }
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(3)) { --listButtonCount: 3; }
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(4)) { --listButtonCount: 4; }
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(5)) { --listButtonCount: 5; }
+.listItem:not(.listItem-largeImage):has(.listViewUserDataButtons > button:nth-of-type(6)) { --listButtonCount: 6; }
+
+/* Gruppe: feste Knopfgröße (2.4em × 0.8 = 1.92em der Zeile), Abstand 0.45em × 0.8 = 0.36em und
+   Platz für den Abspielknopf: (1.92em + 0.36em) / 0.8 = 2.85em */
+.listItem:not(.listItem-largeImage):has(.listItemImageButton) .listViewUserDataButtons {
+    font-size: 0.8em;
+    gap: 0.45em;
+    padding-left: 2.85em;
+}
+
+.listItem:not(.listItem-largeImage):has(.listItemImageButton) .listViewUserDataButtons > .listItemButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4em;
+    height: 2.4em;
+    margin: 0;
+    padding: 0;
+}
+
+/* Der Abspielknopf: gleich groß wie die Nachbarn, senkrecht mittig, mit demselben Abstand links vor
+   dem ersten Knopf. Rechts davon liegen n Knöpfe und n Abstände: n × (1.92em + 0.36em). */
+.listItem:not(.listItem-largeImage) .listItemImageButton {
+    position: fixed;
+    top: calc(50% - 0.96em);
+    right: calc(0.375em + var(--listButtonCount, 3) * 2.28em);
+    bottom: auto;
+    left: auto;
+    width: 1.92em;
+    height: 1.92em;
+    margin: 0;
+    padding: 0;
+    font-size: 1em !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.listItem:not(.listItem-largeImage) .listItemImageButton > .listItemImageButton-icon {
+    font-size: 1.15em;
+    padding: 0;
+}
+
+/* Handy: ElegantFin stapelt die Gruppe senkrecht, der Abspielknopf steht links neben dieser Spalte
+   (Spalte 2.4em × 0.65 = 1.56em, Abstand 0.3em, Platz (1.9em + 0.3em) / 0.65 = 3.4em) */
+.layout-mobile .listItem:not(.listItem-largeImage):has(.listItemImageButton) .listViewUserDataButtons {
+    font-size: 0.65em;
+    gap: 0.3em;
+    padding-left: 3.4em;
+}
+
+.layout-mobile .listItem:not(.listItem-largeImage) .listItemImageButton {
+    top: calc(50% - 0.95em);
+    right: calc(0.375em + 1.56em + 0.3em);
+    width: 1.9em;
+    height: 1.9em;
+}
+
+/* titelnummer-wird-play: Albumseite: Titelnummer wird beim Überfahren zum Abspielknopf */
+/* Albumseite, Titelliste (controllers/itemDetails: listView mit showIndexNumberLeft, image: false,
+   action "playallfromhere"). Vorn steht .listItem-indexnumberleft mit der Titelnummer: ein schmaler
+   Block (min-width 2 %, zentriert, rechts 1em Abstand). Er ist kein .itemAction, Jellyfins
+   Klickbehandlung (shortcuts.onClick) übergeht ihn; die Zeile spielt nur über .listItemBody
+   (itemAction, ohne eigene Aktion, also die der Zeile). Das Skript reicht den Klick auf die Nummer
+   dorthin weiter.
+   Beim Überfahren der Zeile wird die Nummer durchsichtig (ihr Platz bleibt), darüber liegt als
+   ::before ein Abspielknopf mit den Werten des Schalters „einheitliche-playbuttons“ (grüne Fläche,
+   heller Rand, weißes gefülltes Symbol, Schatten; beim Überfahren des Knopfs heller und etwas
+   größer), absolut in der Mitte des Blocks: Die Zeile verschiebt sich nicht. Kreis 1.55em × 1.15em
+   = 1.78em der Zeile, so groß wie die Abspielknöpfe in Listen; ragt er über den schmalen Block, liegt
+   er im Abstand daneben. Symbol \e037 (play_arrow) wie Jellyfins .material-icons.play_arrow, in der
+   Schrift von ElegantFin (--iconPack) und sonst in Jellyfins Material Icons.
+   Abspielknöpfe auf Covern (.listItemImageButton, Schalter „liste-playbutton-hinten“) gibt es in
+   dieser Liste nicht (image: false), die Regeln berühren sich nicht. Jellyfin 10.11.11 markiert das
+   laufende Lied hier nicht. Nur am Rechner (.layout-desktop) und nur mit echter Maus. */
+@media (hover: hover) and (pointer: fine) {
+    .layout-desktop .listItem:not([data-action="none"]):has(> .listItemBody.itemAction) > .listItem-indexnumberleft {
+        position: relative;
+    }
+
+    .layout-desktop .listItem:not([data-action="none"]):has(> .listItemBody.itemAction):hover > .listItem-indexnumberleft {
+        color: transparent;
+        text-shadow: none;
+    }
+
+    .layout-desktop .listItem:not([data-action="none"]):has(> .listItemBody.itemAction):hover > .listItem-indexnumberleft::before {
+        content: "\e037";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        width: 1.55em;
+        height: 1.55em;
+        font-family: var(--iconPack, "Material Icons"), "Material Icons";
+        font-size: 1.15em;
+        font-style: normal;
+        font-weight: normal;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        white-space: nowrap;
+        font-feature-settings: "liga";
+        font-variation-settings: "FILL" 1, "wght" var(--wght, 400), "GRAD" var(--grad, 0), "opsz" var(--opsz, 24);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: var(--playButtonColor, var(--btnMiniPlayColor, rgb(41, 154, 93)));
+        color: var(--playButtonIconColor, #fff);
+        border: var(--borderWidth, 0.06em) solid var(--playButtonBorderColor, var(--btnMiniPlayBorderColor, rgb(50, 167, 105)));
+        border-radius: 50%;
+        box-shadow: var(--playButtonShadow, 0 0.1em 0.45em hsla(0, 0%, 0%, 0.35));
+        transform: translate(-50%, -50%);
+        transition: transform 0.2s, background-color 0.2s;
+    }
+
+    .layout-desktop .listItem:not([data-action="none"]):has(> .listItemBody.itemAction) > .listItem-indexnumberleft:hover::before {
+        background-color: var(--playButtonHoverColor, rgb(52, 178, 110));
+        transform: translate(-50%, -50%) scale(1.12);
+    }
+}
+
+/* folgen-playbutton-unten-links: Folgenliste: Abspielknopf unten links (Handy: bei den Knöpfen rechts) */
+/* Große Folgenbilder: Abspielknopf wie .cardOverlayContainer > .cardOverlayFab-primary auf den Karten.
+   Dort: 3em × 3em bei font-size 75 % (ElegantFin), Symbol 1.66956em (Jellyfin), Abstand
+   calc(var(--overlayPlayButtonPosition) - 1.5em) von links und unten, sichtbar beim Überfahren
+   der Karte. font-size mit !important, weil Jellyfin in schmalen Fenstern 0.6em !important setzt. */
+.listItem-largeImage .listItemImage-large .listItemImageButton {
+    position: absolute;
+    top: auto;
+    right: auto;
+    left: calc(var(--overlayPlayButtonPosition) - 1.5em);
+    bottom: calc(var(--overlayPlayButtonPosition) - 1.5em);
+    width: 3em;
+    height: 3em;
+    margin: 0;
+    padding: 0;
+    font-size: 75% !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.listItem-largeImage .listItemImage-large .listItemImageButton > .listItemImageButton-icon {
+    font-size: 1.66956em;
+    padding: 0;
+}
+
+/* Wie auf den Karten: am Rechner erst beim Überfahren oder bei Tastaturfokus sichtbar */
+.layout-desktop .listItem-largeImage .listItemImage-large .listItemImageButton {
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
+}
+
+.layout-desktop .listItem-largeImage:hover .listItemImage-large .listItemImageButton,
+.layout-desktop .listItem-largeImage:focus-within .listItemImage-large .listItemImageButton {
+    opacity: 1;
+}
+
+/* Handy: Abspielknopf aus dem Bild zu den Knöpfen rechts, wie in der Liste C2 (Schalter
+   „Listen: Abspielknopf zu den Knöpfen rechts“, dort die Handy-Werte).
+   ElegantFin stapelt die Gruppe am Handy senkrecht (Gruppe 0.65em, Knöpfe 2.4em = 1.56em der Zeile,
+   Abstand 0.3em, siehe einheitliche Bausteine). Der Knopf steht links neben dieser Spalte, senkrecht
+   mittig. Bezugsrahmen ist die Zeile .listItem-content (contain: layout, position: fixed darin), nicht
+   die ganze Folge, weil darunter noch die Beschreibung steht. ElegantFins backdrop-filter beim
+   Überfahren der Folge würde den Bezugsrahmen verschieben; am Handy gibt es kein echtes Überfahren,
+   er fällt dort weg. Platz in der Gruppe: (1.9em + 0.3em) / 0.65 = 3.4em. */
+.layout-mobile .listItem-largeImage:has(.listItemImageButton) > .listItem-content {
+    contain: layout;
+}
+
+.layout-mobile .listItem-largeImage:hover {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+.layout-mobile .listItem-largeImage:has(.listItemImageButton) .listViewUserDataButtons {
+    padding-left: 3.4em;
+}
+
+.layout-mobile .listItem-largeImage .listItemImage-large .listItemImageButton {
+    position: fixed;
+    top: calc(50% - 0.95em);
+    right: calc(1.56em + 0.3em);
+    bottom: auto;
+    left: auto;
+    width: 1.9em;
+    height: 1.9em;
+    margin: 0;
+    padding: 0;
+    font-size: 1em !important;
+    opacity: 1;
+    z-index: 1;
+}
+
+.layout-mobile .listItem-largeImage .listItemImage-large .listItemImageButton > .listItemImageButton-icon {
+    font-size: 1.15em;
+    padding: 0;
+}
+
+/* detail-inhalt-durchsichtig: Detailseite: Inhalt als dunkles Milchglas über dem Film */
+/* Detailseite: Inhaltsbereich als dunkles Milchglas, Filmbild bleibt beim Hochscrollen dahinter stehen.
+   ElegantFin gibt .detailPageWrapperContainer am Rechner einen Verlauf, der ab 50vh zu 85 %
+   deckt. Dahinter liegt nur .backgroundContainer.withBackdrop (unten dunkel), denn
+   #itemBackdrop zeigt den Film zwar mit background-attachment: fixed, aber nur in seinem eigenen,
+   oberen Kasten. Darum spannt ein ::before den Film über das ganze Fenster (gleiche Quelle,
+   gleiche feste Lage, also nahtlos). */
+.layout-desktop #itemDetailPage .itemBackdrop::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-image: inherit;
+    background-position: inherit;
+    background-size: cover;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+
+/* position: relative, damit der Inhalt über dem festen Filmbild gemalt wird; isolation, damit die
+   Glasfläche (z-index -1) im Inhaltsbereich bleibt und nicht hinter das Filmbild rutscht */
+.layout-desktop #itemDetailPage .detailPageWrapperContainer {
+    position: relative;
+    isolation: isolate;
+    background: none;
+}
+
+/* Die Glasfläche: starke Unschärfe des Films dahinter, dunkle Tönung aus der Theme-Farbe und feine
+   Körnung (SVG-Rauschen) obendrauf. Die Maske lässt sie oben über 24vh weich einlaufen, so wie
+   ElegantFins Verlauf. Erst ein fester rgba-Wert für Browser ohne color-mix. */
+.layout-desktop #itemDetailPage .detailPageWrapperContainer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: rgba(17, 24, 39, 0.82);
+    background-color: color-mix(in srgb, var(--darkerGradientPoint) 82%, transparent);
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'160'%20height%3D'160'%3E%3Cfilter%20id%3D'k'%20x%3D'0'%20y%3D'0'%20width%3D'100%25'%20height%3D'100%25'%3E%3CfeTurbulence%20type%3D'fractalNoise'%20baseFrequency%3D'0.9'%20numOctaves%3D'3'%20stitchTiles%3D'stitch'%2F%3E%3CfeColorMatrix%20values%3D'1.6%200%200%200%20-0.3%20%201.6%200%200%200%20-0.3%20%201.6%200%200%200%20-0.3%20%200%200%200%200%200.08'%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23k)'%2F%3E%3C%2Fsvg%3E");
+    background-size: 160px 160px;
+    background-repeat: repeat;
+    -webkit-backdrop-filter: blur(32px) saturate(1.1);
+    backdrop-filter: blur(32px) saturate(1.1);
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 24vh);
+    mask-image: linear-gradient(180deg, transparent, #000 24vh);
+}
+
+/* Auch Jellyfins deckende Flächen (z. B. .noBackdropTransparency mit #101010) zurücknehmen */
+.layout-desktop #itemDetailPage .detailPagePrimaryContainer,
+.layout-desktop #itemDetailPage .detailPageSecondaryContainer,
+.layout-desktop #itemDetailPage .detailRibbon {
+    background: transparent;
+}
+
+#itemDetailPage .detailPageWrapperContainer {
+    text-shadow: 0 1px 3px hsla(0, 0%, 0%, 0.75);
+}
+
+/* Der Textschatten wird vererbt, auch auf Text, den ElegantFin mit color: transparent ausblendet
+   („Mehr anzeigen“ hinter dem Pfeil, „Links:“ und die Kommas zwischen den Link-Pillen, die
+   Beschriftungen der Spurauswahl, „?“ auf Karten ohne Bild, der Stern der Bewertung). Dort bliebe
+   nur der dunkle Schatten stehen, als schwarze, unscharfe Schrift. Deshalb dort ohne Schatten.
+   :where() hält die Spezifität klein, damit sichtbar gemachter Text (eigene Schalter) wieder einen
+   Schatten bekommen kann. */
+:where(#itemDetailPage .detailPageWrapperContainer) :is(.overview-expand, .itemExternalLinks, .itemTags, .trackSelectionFieldContainer > label, .cardDefaultText, .starIcon),
+:where(#itemDetailPage .detailPageWrapperContainer) .overview-expand::after,
+:where(#itemDetailPage .detailPageWrapperContainer) .itemsContainer::after {
+    text-shadow: none;
+}
+
+/* kopfzeile-beim-scrollen: Kopfzeile wird beim Scrollen deckend und läuft weich aus */
+/* Kopfzeile beim Scrollen: fast deckende Fläche, die unten weich ausläuft.
+   Ursache: Auf Seiten mit leerem Titel (Startseite) macht ElegantFin die Kopfzeile ganz durchsichtig
+   (.skinHeader.headroom:…:has(.pageTitle:empty)), sonst läuft sie als Verlauf aus, der schon auf
+   Höhe der Knöpfe halb durchsichtig ist (--headerColorGradient: 95 % bei 30 %, 0 % bei 90 %);
+   auf der Detailseite (.semiTransparent) ist sie ebenfalls durchsichtig. Beim Scrollen sind
+   Titel und Poster dann unter den Knöpfen lesbar.
+   Gescrollt heißt: .headroom--not-top (headroom.js, das Jellyfin nur im Handy-Layout anhängt) oder
+   .werkstatt-scrolled (setzt das Skript dieses Schalters, auch am Rechner).
+   Die Fläche ist ein ::before hinter dem Inhalt der Kopfzeile (z-index -1 im eigenen Stapel der
+   fest positionierten Kopfzeile), 3em höher als die Leiste. Bis 0.5em vor deren Unterkante deckt sie
+   voll, dann blendet eine Maske Farbe und Unschärfe gemeinsam aus, wie ElegantFins --headerBlurMask.
+   Damit der Auslauf unter der Leiste zu sehen ist, wird Jellyfins contain: paint (schneidet alles
+   am Rand der Kopfzeile ab) auf layout und style zurückgenommen. pointer-events: none, Klicks gehen
+   also durch den Auslauf hindurch auf die Seite. Weich ein- und ausgeblendet per opacity, was mit
+   ElegantFins Verlauf (background-image) nicht ginge. Fernseh-Layout ausgenommen: dort scrollt die
+   Kopfzeile mit der Seite weg. */
+:root:not(.layout-tv) .skinHeader.skinHeader-blurred:not(.osdHeader) {
+    contain: layout style;
+}
+
+:root:not(.layout-tv) .skinHeader.skinHeader-blurred:not(.osdHeader)::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: -3em;
+    left: 0;
+    z-index: -1;
+    background-color: var(--lighterGradientPoint);
+    background-color: color-mix(in srgb, var(--lighterGradientPoint) 94%, transparent);
+    -webkit-backdrop-filter: var(--blurLargest);
+    backdrop-filter: var(--blurLargest);
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 3.5em), transparent);
+    mask-image: linear-gradient(180deg, #000 calc(100% - 3.5em), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+:root:not(.layout-tv) .skinHeader.skinHeader-blurred:not(.osdHeader):is(.headroom--not-top, .werkstatt-scrolled)::before {
+    opacity: 1;
+}
+
+/* Helle Variante: ElegantFin macht die Knöpfe über durchsichtiger Kopfzeile weiß. Auf der hellen
+   Fläche wären sie unsichtbar, deshalb dort die normale Schriftfarbe. */
+:root[data-theme="light"] .skinHeader.skinHeader-blurred:not(.osdHeader):is(.headroom--not-top, .werkstatt-scrolled) .headerButton.headerButton:not(:hover) {
+    color: var(--textColor);
+    text-shadow: none;
+}
+
+/* liste-gesehen-am-knopf: Listen: Gesehen-Status am Haken-Knopf statt auf dem Cover */
+/* Kleine Listen (ohne große Folgenbilder), am Handy auch die Folgenliste: Haken vom Cover nehmen,
+   Status am Haken-Knopf zeigen.
+   Jellyfin setzt am gesehenen Knopf die Klasse .playstatebutton-played, am Symbol
+   .playstatebutton-icon-played (emby-playstatebutton). ElegantFin färbt das Symbol schon grün
+   (in einheitliche-bausteine auf das Playbutton-Grün gesetzt). Der Ring ist ein innerer
+   Schatten, damit sich die Knopfgröße nicht ändert. Die Fläche mit !important, weil Jellyfins
+   Warteschlangen-CSS am Handy im Hochformat allen Symbolknöpfen die Fläche nimmt (!important). */
+.listItem:not(.listItem-largeImage) .listItemIndicators > .playedIndicator,
+.layout-mobile .listItem-largeImage .listItemIndicators > .playedIndicator {
+    display: none;
+}
+
+.listItem:not(.listItem-largeImage) .listViewUserDataButtons > button[is="emby-playstatebutton"].playstatebutton-played,
+.listItem:not(.listItem-largeImage) .listViewUserDataButtons > button[is="emby-playstatebutton"]:has(> .playstatebutton-icon-played),
+.layout-mobile .listItem-largeImage .listViewUserDataButtons > button[is="emby-playstatebutton"].playstatebutton-played,
+.layout-mobile .listItem-largeImage .listViewUserDataButtons > button[is="emby-playstatebutton"]:has(> .playstatebutton-icon-played) {
+    border-radius: 50%;
+    background-color: rgba(41, 154, 93, 0.16) !important;
+    box-shadow: inset 0 0 0 0.14em var(--btnMiniPlayBorderColor);
+}
+
+/* folgen-haken-wie-karten: Folgenliste: Gesehen-Haken wie auf den Karten */
+/* Gesehen-Haken auf großen Folgenbildern wie auf Karten.
+   Karten: .cardIndicators in voller Schriftgröße, ElegantFin setzt top/right 0.5em (Handy 0.45em/0.5em).
+   Listen: Jellyfin verkleinert .listItemIndicators mit font-size: 0.6em !important und setzt
+   top/right 0.324em. Grün, Ring und Kreisform kommen bei beiden aus .indicator/.playedIndicator,
+   die Größe (2em bei 80 % Schrift) hängt also nur an der Schriftgröße des Behälters. */
+.listItem-largeImage .listItemImage-large > .listItemIndicators {
+    font-size: 1em !important;
+    top: 0.5em;
+    right: 0.5em;
+    left: auto;
+}
+
+.layout-mobile .listItem-largeImage .listItemImage-large > .listItemIndicators {
+    top: 0.45em;
+}
+
+/* klassisches-dunkel: Klassischer Darkmode statt Blaugrau */
+/* Grundfarbe „Grau“. ElegantFin leitet Karten-Platzhalter, Hintergrundverlauf, Tabellenzeilen,
+   Eingabefelder, Dialoge und Kontextmenüs aus diesen Variablen ab, sie ziehen also mit. */
+:root:not([data-theme="light"]) {
+    --darkerGradientPoint: #0f0f0f;
+    --darkerGradientPointAlpha: rgba(15, 15, 15, 0.85);
+    --lighterGradientPoint: #1e1e1e;
+    --lighterGradientPointAlpha: rgba(30, 30, 30, 0.85);
+    --gradientPointAlpha: rgba(30, 30, 30, 0.3);
+    --headerColor: rgba(30, 30, 30, 0.8);
+    --drawerColor: rgba(30, 30, 30, 0.9);
+
+    --borderColor: hsl(0, 0%, 25%);
+    --darkerBorderColor: hsl(0, 0%, 17%);
+
+    --selectorBackgroundColor: hsl(0, 0%, 20%);
+    --selectorBackgroundColorAlpha: hsla(0, 0%, 20%, 0.5);
+
+    --textColor: rgb(214, 214, 214);
+    --dimTextColor: rgb(163, 163, 163);
+
+    --tableBodyColor: rgb(36, 36, 36);
+
+    --headerColorGradient: linear-gradient(180deg, rgba(30, 30, 30, 0.95) 30%, 55%, transparent 90%);
+    --headerColorGradientAlt: linear-gradient(180deg, rgba(30, 30, 30, 1), 70%, transparent);
+}
+
+/* ElegantFin nimmt am Handy die kompaktere Kopfzeile (:root.layout-mobile). Die Zeile oben hätte
+   das bei gleicher Spezifität überschrieben, deshalb hier noch einmal. */
+:root.layout-mobile:not([data-theme="light"]) {
+    --headerColorGradient: var(--headerColorGradientAlt);
+}
+
+/* Fest verdrahtet in ElegantFin: Hintergrund hinter Detailseiten und Bibliotheken mit Filmbild.
+   Gleiche Ausnahmen wie im Original (Handy und Seiten mit Reitern haben eine eigene, volle Fläche). */
+:root:not(.layout-mobile):not(.layout-tv):not([data-theme="light"]) body:not(.withSectionTabs) .backgroundContainer.withBackdrop {
+    background: linear-gradient(0deg, var(--darkerGradientPoint), 45%, rgba(15, 15, 15, 0.25));
+}
+
+:root.layout-tv:not([data-theme="light"]) body:not(.withSectionTabs) .backgroundContainer.withBackdrop {
+    background: linear-gradient(0deg, var(--darkerGradientPoint), 45%, rgba(15, 15, 15, 0.95));
+}
+
+/* Fest verdrahtet: halbdurchsichtiger Kasten der Anmeldeseite */
+:root:not([data-theme="light"]) #loginPage .padded-left.padded-right.padded-bottom-page {
+    background: rgba(30, 30, 30, 0.7);
+}
+
+/* Fest verdrahtet: Symbole in der Seitenleiste des Metadaten-Editors */
+:root:not([data-theme="light"]) .metadataSidebarIcon {
+    color: hsl(0, 0%, 58%);
+}
+
+/* bibliothek-ohne-abspielen-zufall: Bibliothek: ohne „Alles abspielen“ und „Zufall“ */
+/* Werkzeugleiste der Bibliothek: Alles abspielen und Zufall ausblenden, der Seitenzähler bleibt */
+.libraryPage .btnPlayAll,
+.libraryPage .btnShuffle {
+    display: none;
+}
+
+/* Ordnerseite (list.html: Heimvideos wie „Konzerte“, Ordner, Listen hinter „Mehr“): „Alles abspielen“
+   heißt dort .btnPlay, als Textknopf (ab 40em) und als Symbolknopf (darunter). Nur in deren Leiste
+   (.itemsViewSettingsContainer), denn .btnPlay heißt auch der grüne Knopf der Detailseite, und die
+   ist ebenfalls eine .libraryPage. Zufall ist oben schon erfasst, „Zur Warteschlange“ (.btnQueue,
+   nur während einer Wiedergabe) bleibt. */
+.libraryPage .itemsViewSettingsContainer > .btnPlay {
+    display: none;
+}
+
+/* serien-staffelzahl: Serien: Staffelzahl im Zähler */
+/* Serienbibliothek, Reiter „Serien“: Bis das Skript die Staffelzahl eingetragen hat, ist die
+   Folgenzahl unsichtbar (sonst blitzt „99+“ kurz auf). Gilt nur, wenn das Skript läuft: Es setzt
+   die Klasse werkstattStaffelzahl am <html> und markiert jeden bearbeiteten Kreis mit
+   data-werkstatt-staffeln. Ohne Skript bleibt Jellyfins Zahl sichtbar. */
+.werkstattStaffelzahl #tvRecommendedPage #seriesTab [data-type="Series"][data-id] .countIndicator:not([data-werkstatt-staffeln]) {
+    color: transparent;
+}
+
+/* handy-meine-medien-untereinander: Handy: „Meine Medien“ zweispaltig */
+/* Startseite am Handy, Abschnitt „Meine Medien“ (homesections, libraryTiles.ts): Jellyfin baut die
+   Bibliotheken als waagerecht scrollende Reihe (emby-scroller mit .scrollX, darin .scrollSlider mit
+   white-space: nowrap als Inline-Stil, Kacheln .overflowBackdropCard; ElegantFin: zwei Kacheln je
+   Bildschirmbreite, Einrasten beim Wischen). Erkannt wird der Abschnitt an seinen Karten (Bibliotheken
+   sind CollectionFolder oder UserView), weil jeder die Reihenfolge der Abschnitte selbst einstellt.
+   Daraus wird ein Raster mit zwei gleich breiten Spalten, ohne waagerechtes Scrollen.
+   Nur .layout-mobile, der Rechner bleibt bei der Reihe. */
+.layout-mobile .homeSectionsContainer > .verticalSection:has(.card[data-type="CollectionFolder"], .card[data-type="UserView"]) > .emby-scroller {
+    overflow: visible;
+    scroll-snap-type: none;
+    padding-right: var(--sidePadding);
+}
+
+/* Abstand in beide Richtungen ElegantFins --itemColumnGap, wie zwischen den Karten einer Reihe
+   (die Namen unter den Kacheln sind standardmäßig aus, sonst stünden die Zeilen zu weit auseinander) */
+.layout-mobile .homeSectionsContainer > .verticalSection:has(.card[data-type="CollectionFolder"], .card[data-type="UserView"]) > .emby-scroller > .itemsContainer.scrollSlider {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--itemColumnGap);
+    white-space: normal !important;
+}
+
+/* ElegantFins Abstandhalter am Ende einer Reihe („13“ in durchsichtiger Schrift) braucht es hier nicht,
+   im Raster wäre er eine eigene Zelle */
+.layout-mobile .homeSectionsContainer > .verticalSection:has(.card[data-type="CollectionFolder"], .card[data-type="UserView"]) > .emby-scroller > .itemsContainer.scrollSlider::after {
+    content: none;
+}
+
+/* Jede Kachel so breit wie ihre Spalte (ElegantFin setzt die Breite mit !important auf eine halbe
+   Bildschirmbreite abzüglich Abstand); das Seitenverhältnis kommt aus .cardPadder und bleibt 2:1 */
+.layout-mobile .homeSectionsContainer > .verticalSection:has(.card[data-type="CollectionFolder"], .card[data-type="UserView"]) .itemsContainer.scrollSlider > .card {
+    width: auto !important;
+    min-width: 0;
+    scroll-snap-align: none;
+}
+
+/* seitenmenue-weiche-kante: Seitenmenü ohne harte Kante */
+/* Seitenmenü: Linie rechts (ElegantFin: border-right: var(--defaultBorder)) durch einen weichen
+   Schatten ersetzen. Jellyfins eigener Schatten (.drawer-open, 2px 0 12px) wird mit übernommen. */
+.mainDrawer,
+.drawer-open {
+    border-right: 0;
+    box-shadow: 0.25em 0 1.5em hsla(0, 0%, 0%, 0.35), 1em 0 4em hsla(0, 0%, 0%, 0.3);
+}
+
+/* detail-links-hell: Detailseite: „Mehr anzeigen“ und Links gut lesbar */
+/* Detailseite: helle, gut lesbare Verweise.
+   ElegantFin: .overview-expand.emby-button und .itemExternalLinks mit color: transparent (nur Pfeil
+   bzw. Pillen sichtbar), .button-link in --dimTextColor, beim Überfahren color: unset !important.
+   Die Gruppen-Links tragen bei Jellyfin style="color:inherit", erben also die Farbe ihres Behälters.
+   Das Überfahren gilt nicht im Handy-Layout: dort bliebe es nach dem Antippen hängen. */
+#itemDetailPage .overview-expand.emby-button {
+    color: var(--textColor);
+    gap: 0.5em;
+    align-items: center;
+}
+
+#itemDetailPage .itemExternalLinks {
+    color: var(--textColor);
+}
+
+#itemDetailPage .detailsGroupItem > .focuscontainer-x {
+    color: var(--textColor);
+}
+
+html:not(.layout-mobile) #itemDetailPage .overview-expand.emby-button:hover,
+html:not(.layout-mobile) #itemDetailPage .detailsGroupItem > .focuscontainer-x > .button-link:hover {
+    color: var(--fullContrastColor) !important;
+    text-decoration: underline;
+}
+
+html:not(.layout-mobile) #itemDetailPage .overview-expand.emby-button:hover::after {
+    background-color: var(--accentColor);
+    color: var(--accentTextColor, #fff);
+}
+
+/* handy-detail-kopfzeile: Handy: Kopfzeile der Detailseite mit Acryl wie überall */
+/* Handy, Detailseite: Kopfzeile wie die nahtlose Kopfzeile der anderen Seiten.
+   ElegantFin: .skinHeader-withBackground.semiTransparent setzt --headerBackground: none, Fläche und Rand
+   weg; das ::after mit der Unschärfe gibt es nur für :not(.semiTransparent). Jellyfin (Design dunkel)
+   setzt dort backdrop-filter: none !important. Hier dieselben Werte wie bei
+   .skinHeader-blurred:not(.osdHeader):not(.semiTransparent), nur direkt aus --headerColorGradient
+   (am Handy ElegantFins kompakte Fassung), weil --headerBackground am Element geleert ist. */
+.layout-mobile .skinHeader.skinHeader-blurred.semiTransparent:not(.osdHeader) {
+    background: var(--appBarColor, var(--headerColorGradient));
+    border: var(--appBarBorder, none);
+    border-width: 0 0 var(--borderWidth) 0;
+    -webkit-backdrop-filter: var(--appBarBlurStrength, none) !important;
+    backdrop-filter: var(--appBarBlurStrength, none) !important;
+}
+
+.layout-mobile .skinHeader.skinHeader-blurred.semiTransparent:not(.osdHeader)::after {
+    content: var(--appBarSeamlessBlur, "");
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    -webkit-backdrop-filter: var(--blurLargest);
+    backdrop-filter: var(--blurLargest);
+    -webkit-mask: var(--headerBlurMask);
+    mask: var(--headerBlurMask);
+}
+
+/* Knöpfe wie auf den anderen Seiten: Schriftfarbe statt Weiß mit Schatten */
+.layout-mobile .skinHeader.skinHeader-withBackground.semiTransparent .headerButton:not(:hover),
+.layout-mobile .skinHeader.skinHeader-withBackground.semiTransparent .headerButton:hover {
+    color: inherit;
+    text-shadow: none !important;
+}
+
+/* handy-knoepfe-ruhig: Handy: Knöpfe färben sich beim Antippen nicht um */
+/* Handy: kein Umfärben von Knöpfen bei :hover, :focus und :active.
+   Grundsatz: Im Handy-Layout zeigen Überfahren und Fokus nach dem Tippen nichts an (auf Touch
+   bleiben beide hängen), :active nur eine dezente helle Fläche, Symbol und Text bleiben hell.
+   Erfasst aus vendor/elegantfin-v26.09.05.css, Jellyfins CSS und den eigenen Schaltern:
+     .paper-icon-button-light  ElegantFin :hover (nur mit Maus) und :active: Symbol --zeroContrastColor
+                               (schwarz) auf --hoverBackgroundColor (weiß, einheitliche Bausteine);
+                               Jellyfins playback-queue-CSS: background-color: transparent !important
+                               (Hochformat bis 43em) → schwarzes Symbol ohne Fläche
+     .emby-tab-button          ElegantFin :hover weiß mit schwarzer Schrift
+     .alphaPickerButton        Buchstaben-Schalter :hover weiß mit schwarzer Schrift (ohne Medienabfrage)
+     .listItem (Listen, actionSheet-Einträge)  ElegantFin :focus in --highlightOutlineColor (bleibt nach
+                               dem Tippen stehen), :hover hell mit weißer Schrift
+     .navMenuOption            ElegantFin :hover hell mit weißer Schrift
+     .button-flat, .detailButton  ElegantFin :hover hell; .btnPlay der Detailseite: :hover heller und größer
+     .button-link              ElegantFin :hover color: unset, einheitliche Bausteine weiß unterstrichen
+     .itemExternalLinks > a    ElegantFin :active in Akzent- bzw. Markenfarbe
+     .fab                      ElegantFin :focus mit brightness(1.2)
+     .listItemImageButton      grüne Abspielknöpfe: :hover heller und größer (ohne Medienabfrage)
+     .headerUserButton         verliert beim Überfahren seine dunkle Fläche
+   Unverändert, weil schon passend: .emby-button:active (brightness 1.05, scale 0.98),
+   .detailButton:active und .listItem:active (dezente helle Fläche), .button-submit (Fläche !important),
+   .show-focus:focus (setzt Jellyfin nur im Fernseh-Layout).
+   Ausgenommen sind Player, Musikleiste, Wiedergabeseite und „Als Nächstes“ (tweaks-player.js), per
+   :not(:where(…)); :where hält die Spezifität klein, damit die Player-Regeln ungestört bleiben.
+   Steht als letzter eigener Schalter, damit er die Regeln der übrigen Schalter überstimmt. */
+
+/* Variable der Überfahr-Fläche: am Handy keine (die helle Antipp-Fläche kommt unten) */
+:root.layout-mobile,
+:root.layout-mobile[data-theme] {
+    --hoverBackgroundColor: transparent;
+}
+
+/* ---------- Symbolknöpfe (Kopfzeile, Karten ⋮, Listen, Werkzeugleiste C1, Scroll- und Dialogknöpfe) */
+.layout-mobile .paper-icon-button-light:not(.listItemImageButton, .cardOverlayFab-primary):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):is(:hover, :focus, :active):not(:disabled) {
+    color: inherit;
+}
+
+.layout-mobile .paper-icon-button-light:not(.listItemImageButton, .cardOverlayFab-primary, .cardOverlayButton-br:not([data-action="menu"])):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):active:not(:disabled) {
+    background-color: hsla(0, 0%, 100%, 0.16) !important;
+}
+
+.layout-mobile .headerButton.headerUserButton:not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):is(:hover, :focus):not(:active) {
+    background-color: var(--darkerGradientPointAlpha);
+}
+
+/* Kopfzeile über Bild: ElegantFin macht die Knöpfe nur ohne :hover weiß mit Schatten */
+.layout-mobile .skinHeader-withBackground.semiTransparent .headerButton.headerButton:is(:hover, :focus),
+.layout-mobile .skinHeader.headroom:not(.osdHeader, .noHomeButtonHeader):has(.pageTitle:empty) .headerButton.headerButton:is(:hover, :focus) {
+    color: #fff;
+    text-shadow: var(--iconShadow) !important;
+}
+
+/* ⋮ auf Karten: ElegantFin färbt das Symbol beim Antippen schwarz (.cardOverlayButton-br:active) */
+.layout-mobile .cardOverlayButton-br[data-action="menu"]:active > .cardOverlayButtonIcon {
+    color: #fff;
+    text-shadow: var(--iconShadow);
+}
+
+/* ---------- Reiter: Überfahren und Fokus wie in Ruhe; der aktive Reiter bleibt Akzentfläche */
+.layout-mobile .sectionTabs .emby-tab-button.emby-tab-button:not(.emby-tab-button-active):is(:hover, :focus) {
+    color: var(--textColor);
+    background-color: var(--darkerGradientPointAlpha);
+}
+
+/* ---------- Buchstaben: wie in Ruhe, beim Antippen die helle Fläche; der gewählte bleibt Akzentkreis */
+.layout-mobile .alphaPicker .alphaPickerButton.alphaPickerButton:not(.alphaPickerButton-selected):is(:hover, :focus) {
+    background-color: transparent;
+    color: var(--dimTextColor);
+}
+
+.layout-mobile .alphaPicker .alphaPickerButton.alphaPickerButton:not(.alphaPickerButton-selected):active {
+    background-color: hsla(0, 0%, 100%, 0.16);
+    color: var(--dimTextColor);
+}
+
+/* ---------- Listen- und Menüeinträge (C2, D2, F1, E2/E3-Menüs, Einstellungen) und Seitenmenü.
+   Gewählte Menüpunkte (actionSheet mit sichtbarem Häkchen) und der aktive Menüeintrag behalten ihre
+   Akzentfläche. Beim Antippen bleibt ElegantFins dezente Fläche (--activeBackgroundColor). */
+.layout-mobile .listItem:not(:has(> .listItemIcon.check:not([style*="hidden"]))):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):hover:not(:active),
+.layout-mobile .listItem:not(:has(> .listItemIcon.check:not([style*="hidden"]))):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):focus:not(:focus-visible):not(:active),
+.layout-mobile .navMenuOption:not(.navMenuOption-selected):is(:hover, :focus):not(:active) {
+    color: inherit !important;
+    background: transparent !important;
+}
+
+.layout-mobile .listItem:not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):hover .listItemBodyText:not(.secondary) {
+    color: inherit !important;
+}
+
+.layout-mobile .listItem:not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):hover .secondary {
+    color: var(--dimTextColor) !important;
+}
+
+/* ---------- Flache Knöpfe und runde Knöpfe der Detailseite: wie in Ruhe */
+.layout-mobile .button-flat:not(.btnPlay):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):is(:hover, :focus):not(:active) {
+    background-color: transparent;
+    color: inherit;
+}
+
+/* Grüner Abspielknopf der Detailseite: bleibt beim Überfahren grün und gleich groß */
+.layout-mobile .btnPlay.detailButton.detailButton:is(:hover, :focus):not(:active) {
+    background-color: var(--playButtonColor, var(--btnMiniPlayColor));
+    color: var(--playButtonIconColor, #fff);
+    filter: none;
+    transform: none;
+}
+
+/* Grüne Abspielknöpfe in Listen und Folgen: ebenso */
+.layout-mobile .listItemImageButton.listItemImageButton:is(:hover, :focus):not(:active) {
+    background-color: var(--playButtonColor, var(--btnMiniPlayColor)) !important;
+    transform: none;
+}
+
+/* ---------- Textlinks: Farbe wie in Ruhe, kein Unterstrich; „Mehr anzeigen“ regelt seinen Schalter */
+.layout-mobile .button-link:not(.overview-expand):not(:where(.videoOsdBottom *, .osdHeader *, .nowPlayingBar *, .nowPlayingPage *, .upNextContainer *)):is(:hover, :focus):not(:active) {
+    color: var(--textColor) !important;
+    text-decoration: none;
+}
+
+/* Link-Pillen der Detailseite: beim Antippen nur etwas heller statt Akzent- bzw. Markenfarbe */
+.layout-mobile .itemExternalLinks > a.button-link.button-link:is(:hover, :focus, :active) {
+    background-color: var(--selectorBackgroundColor) !important;
+    color: var(--textColor) !important;
+    text-decoration: none;
+}
+
+.layout-mobile .itemExternalLinks > a.button-link.button-link:active {
+    filter: brightness(1.2);
+}
+
+/* ---------- Schwebende Knöpfe: kein Aufhellen nach dem Tippen */
+.layout-mobile .fab.fab:focus:not(:active) {
+    filter: none;
+}
+
+/* player-kapitelmarken-beim-ziehen: Kapitelmarken beim Überfahren und Ziehen */
+/* Kapitelmarken beim Überfahren und Ziehen.
+   Die Marken bleiben im Layout (nur durchsichtig), weil Jellyfin sie beim Setzen ausmisst
+   (setMarker() bricht ab, wenn eine Marke keine Breite hat).
+   Sichtbar bei :hover, :active, Tastaturfokus oder .werkstatt-ziehen (setzt das Skript beim Drücken). */
+:root {
+    --werkstatt-kapitelmarken: 1;
+}
+
+/* Reihenfolge der Ebenen: Balken, darüber die Marken, darüber der Regler mit seinem Kreis, ganz oben die Blase */
+.videoOsdBottom .sliderMarkerContainer {
+    top: 50%;
+    height: 0;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease-out;
+}
+
+.videoOsdBottom .sliderContainer > .osdPositionSlider {
+    position: relative;
+    z-index: 2;
+}
+
+.videoOsdBottom .sliderContainer:hover > .sliderMarkerContainer,
+.videoOsdBottom .sliderContainer:active > .sliderMarkerContainer,
+.videoOsdBottom .sliderContainer.werkstatt-ziehen > .sliderMarkerContainer,
+.videoOsdBottom .sliderContainer:has(> .osdPositionSlider:focus-visible) > .sliderMarkerContainer {
+    opacity: 1;
+}
+
+/* Wie bei :active: der Balken wird beim Ziehen etwas dicker (gemeinsame Höhe aus „einheitliche-bausteine“) */
+.videoOsdBottom .sliderContainer.werkstatt-ziehen .mdl-slider-background-flex {
+    --h: var(--wsTrackHeightActive, calc(var(--thumb, 0.4em) * 1.5));
+    height: var(--h);
+    border-radius: var(--h);
+    margin-top: calc(var(--h) / -2);
+}
+
+/* Etwas höher als die Leiste und mittig darauf, damit die Marken auch über dem gespielten Teil zu sehen sind */
+.videoOsdBottom .sliderMarker {
+    top: 0;
+    width: 3px;
+    height: 0.8em;
+    border-radius: 2px;
+    transform: translateY(-50%);
+    box-shadow: 0 0 0 1px hsla(0, 0%, 0%, 0.45);
+}
+
+/* regler-fuellung-folgt: Zeitleisten: Füllung folgt beim Ziehen */
+/* Füllung folgt beim Ziehen: nur der Schalter für das Skript, die Breite setzt das Skript */
+:root {
+    --werkstatt-fuellung: 1;
+}
+
+/* zeitleiste-gleitet: Zeitleisten gleiten statt zu springen */
+/* Zeitleisten gleiten: nur der Schalter für das Skript, die Bewegung macht das Skript */
+:root {
+    --werkstatt-gleiten: 1;
+}
+
+/* player-kapitelabschnitt-gross: Kapitelabschnitt unter dem Zeiger dicker */
+/* Dicker Kapitelabschnitt. Das Skript legt .werkstattAbschnitt in den .sliderContainer, setzt
+   left, width, top in px und die Grenzen von gespielt und gepuffert als Variablen.
+   Die Leiste bekommt an derselben Stelle eine Lücke (Maske), damit sich halb durchsichtige Farben nicht doppeln. */
+:root {
+    --werkstatt-abschnitt: 1;
+}
+
+.videoOsdBottom .sliderContainer > .werkstattAbschnitt {
+    display: none;
+}
+
+.videoOsdBottom .sliderContainer.werkstattAbschnittAktiv > .werkstattAbschnitt {
+    display: block;
+    position: absolute;
+    z-index: 1;
+    height: calc(var(--wsTrackHeightActive, 0.6em) * 2);
+    transform: translateY(-50%);
+    border-radius: var(--wsTrackRadius, 999px);
+    pointer-events: none;
+    background: linear-gradient(90deg,
+        var(--wsFillColor, var(--osdSeekBarPlayedColor, var(--accentColor))) var(--werkstatt-gespielt, 0px),
+        var(--wsBufferColor, var(--osdSeekBarBufferedColorAlpha, hsla(0, 0%, 50%, 0.5))) var(--werkstatt-gespielt, 0px),
+        var(--wsBufferColor, var(--osdSeekBarBufferedColorAlpha, hsla(0, 0%, 50%, 0.5))) var(--werkstatt-gepuffert, 0px),
+        var(--wsTrackColor, var(--osdSeekBarBufferedColorAlpha, hsla(0, 0%, 50%, 0.5))) var(--werkstatt-gepuffert, 0px));
+}
+
+.videoOsdBottom .sliderContainer.werkstattAbschnittAktiv .mdl-slider-background-flex {
+    -webkit-mask-image: linear-gradient(90deg, #000 var(--werkstatt-luecke-l, 0px), transparent var(--werkstatt-luecke-l, 0px), transparent var(--werkstatt-luecke-r, 0px), #000 var(--werkstatt-luecke-r, 0px));
+    mask-image: linear-gradient(90deg, #000 var(--werkstatt-luecke-l, 0px), transparent var(--werkstatt-luecke-l, 0px), transparent var(--werkstatt-luecke-r, 0px), #000 var(--werkstatt-luecke-r, 0px));
+}
+
+/* player-akzentfarbe: Blaue Reste im Player in Akzentfarbe */
+/* Was im Player außer den Reglern noch blau ist: */
+
+/* 1. Kapitelmarken (Jellyfin: watched #00a4dc) */
+.videoOsdBottom .sliderMarker.watched {
+    background-color: var(--accentColor);
+}
+
+.videoOsdBottom .sliderMarker.unwatched {
+    background-color: hsla(0, 0%, 100%, 0.55);
+}
+
+/* 2. Lautstärke-Einblendung oben rechts beim Regeln per Taste */
+.iconOsdProgressInner {
+    background: var(--accentColor);
+}
+
+/* 3. SyncPlay-Symbol in der Bildmitte: Jellyfins Puls-Animation ist fest in Blau.
+   Eigene Animationen mit denselben Stufen, nur in Akzentfarbe (erst ein fester Wert für ältere Browser). */
+@keyframes werkstattPulse {
+    0% {
+        background: hsla(0, 0%, 100%, 0.2);
+        background: color-mix(in srgb, var(--accentColor) 30%, transparent);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accentColor) 30%, transparent);
+        color: hsla(0, 0%, 100%, 0.7);
+        color: color-mix(in srgb, var(--accentColor) 70%, transparent);
+        transform: scale(0.95);
+    }
+    70% {
+        background: transparent;
+        box-shadow: 0 0 0 60px transparent;
+        color: transparent;
+        transform: scale(1);
+    }
+    to {
+        background: transparent;
+        box-shadow: 0 0 0 0 transparent;
+        color: transparent;
+        transform: scale(0.95);
+    }
+}
+
+@keyframes werkstattPulseLoop {
+    0% {
+        background: hsla(0, 0%, 100%, 0.2);
+        background: color-mix(in srgb, var(--accentColor) 30%, transparent);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accentColor) 30%, transparent);
+        color: hsla(0, 0%, 100%, 0.7);
+        color: color-mix(in srgb, var(--accentColor) 70%, transparent);
+        transform: scale(0.95);
+    }
+    70% {
+        background: transparent;
+        box-shadow: 0 0 0 60px transparent;
+        color: hsla(0, 0%, 100%, 0.6);
+        color: color-mix(in srgb, var(--accentColor) 60%, transparent);
+        transform: scale(1);
+    }
+    to {
+        background: hsla(0, 0%, 100%, 0.2);
+        background: color-mix(in srgb, var(--accentColor) 30%, transparent);
+        box-shadow: 0 0 0 0 transparent;
+        color: hsla(0, 0%, 100%, 0.7);
+        color: color-mix(in srgb, var(--accentColor) 70%, transparent);
+        transform: scale(0.95);
+    }
+}
+
+.syncPlayIconCircle.oneShotPulse {
+    animation-name: werkstattPulse;
+}
+
+.syncPlayIconCircle.infinitePulse {
+    animation-name: werkstattPulseLoop;
+}
+
+/* player-knoepfe-einheitlich: Player-Knöpfe: Play/Pause wie alle anderen */
+/* Player-Knöpfe einheitlich.
+   Play/Pause verliert jede eigene Fläche (auch die grüne aus „Abspielknöpfe überall gleich“,
+   falls die noch greift) und sieht aus wie die übrigen Knöpfe. */
+.videoOsdBottom .buttons .btnPause,
+.nowPlayingBar .nowPlayingBarTop .playPauseButton,
+.nowPlayingInfoContainer .nowPlayingInfoButtons .btnPlayPause {
+    background-color: transparent;
+    border: 0;
+    box-shadow: none;
+    color: inherit;
+    text-shadow: none;
+    transform: none;
+}
+
+.videoOsdBottom .paper-icon-button-light,
+.osdHeader .paper-icon-button-light,
+.nowPlayingBar .paper-icon-button-light,
+.nowPlayingInfoButtons .paper-icon-button-light,
+.nowPlayingSecondaryButtons .paper-icon-button-light,
+.nowPlayingPageUserDataButtonsTitle .paper-icon-button-light,
+.playlistSectionButton .paper-icon-button-light {
+    border-radius: 50%;
+}
+
+/* Wiedergabeseite: schlichtes Pause/Play wie in der Musikleiste statt gefülltem Kreis */
+.nowPlayingInfoButtons .btnPlayPause {
+    font-size: 2.2em;
+}
+
+.nowPlayingInfoButtons .btnPlayPause .material-icons.pause_circle_filled::before {
+    content: "\e034";
+}
+
+.nowPlayingInfoButtons .btnPlayPause .material-icons.play_circle_filled::before {
+    content: "\e037";
+}
+
+/* Desktop: die Markierung von Play/Pause nur wenig größer als bei den Nachbarn (Wunsch: „diese weiße
+   Markierung, wenn ich über Play hover, ist zu groß“). Jellyfins Innenabstand (0.556em) wächst mit der
+   Schrift; weil Play/Pause größer gesetzt ist, wurde der Kreis in der Musikleiste 4.7em groß und ragte
+   über die 4.2em hohe Leiste, auf der Wiedergabeseite war er mehr als doppelt so groß wie die übrigen.
+   Jetzt ist der Rand um das Symbol etwa so breit wie bei den Nachbarn, das Symbol bleibt etwas größer:
+   Musikleiste Kreis 3.3em (übrige 2.8em), Wiedergabeseite 4.7em (übrige 3.5em, Werte in Schrift der Seite),
+   Video-Player etwa 1,25-mal so groß wie die übrigen. Am Handy bleibt alles, wie es ist. */
+:root:not(.layout-mobile) .nowPlayingBar .nowPlayingBarTop .playPauseButton {
+    font-size: 1.75em;
+    padding: 0.32em;
+}
+
+:root:not(.layout-mobile) .nowPlayingInfoContainer .nowPlayingInfoButtons .btnPlayPause {
+    font-size: 1.6em;
+    padding: 0.35em;
+}
+
+/* Video-Player: ElegantFin setzt Play/Pause in der Leiste auf 2em, in der Bildmitte („Wiedergabe-Knöpfe
+   groß in der Bildmitte“) ist es 1.5-mal so groß wie die Nachbarn; der Rand entspricht jeweils 0.556em der Nachbarn */
+:root:not(.layout-mobile) .videoOsdBottom.videoOsdBottom-maincontrols .buttons .btnPause {
+    padding: 0.278em;
+}
+
+:root:not(.layout-mobile) .videoOsdBottom .buttons > div[dir="ltr"] > .btnPause {
+    padding: 0.37em;
+}
+
+/* Markierung: über dem Video immer weiß mit schwarzem Symbol */
+@media (hover: hover) and (pointer: fine) {
+    .videoOsdBottom .paper-icon-button-light:hover:not(:disabled),
+    .osdHeader .paper-icon-button-light:hover:not(:disabled) {
+        background-color: var(--wsIconHoverBg, #fff) !important;
+        color: var(--wsIconHoverColor, #000) !important;
+        transform: none !important;
+    }
+}
+
+.videoOsdBottom .paper-icon-button-light:active:not(:disabled),
+.osdHeader .paper-icon-button-light:active:not(:disabled),
+.videoOsdBottom .paper-icon-button-light.show-focus:focus,
+.osdHeader .paper-icon-button-light.show-focus:focus {
+    background-color: var(--wsIconHoverBg, #fff) !important;
+    color: var(--wsIconHoverColor, #000) !important;
+    transform: none !important;
+}
+
+/* Musikleiste und Wiedergabeseite: im dunklen Design weiß mit schwarzem Symbol, im hellen umgekehrt */
+@media (hover: hover) and (pointer: fine) {
+    .nowPlayingBar .paper-icon-button-light:hover:not(:disabled),
+    .nowPlayingInfoButtons .paper-icon-button-light:hover:not(:disabled),
+    .nowPlayingSecondaryButtons .paper-icon-button-light:hover:not(:disabled),
+    .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light:hover:not(:disabled),
+    .playlistSectionButton .paper-icon-button-light:hover:not(:disabled) {
+        background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+        color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+        transform: none !important;
+    }
+}
+
+.nowPlayingBar .paper-icon-button-light:active:not(:disabled),
+.nowPlayingInfoButtons .paper-icon-button-light:active:not(:disabled),
+.nowPlayingSecondaryButtons .paper-icon-button-light:active:not(:disabled),
+.nowPlayingPageUserDataButtonsTitle .paper-icon-button-light:active:not(:disabled),
+.playlistSectionButton .paper-icon-button-light:active:not(:disabled),
+.nowPlayingBar .paper-icon-button-light.show-focus:focus,
+.nowPlayingInfoButtons .paper-icon-button-light.show-focus:focus,
+.nowPlayingSecondaryButtons .paper-icon-button-light.show-focus:focus,
+.nowPlayingPageUserDataButtonsTitle .paper-icon-button-light.show-focus:focus,
+.playlistSectionButton .paper-icon-button-light.show-focus:focus {
+    background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+    color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+    transform: none !important;
+}
+
+/* Handy: beim Antippen keine Farbänderung. Jellyfins Warteschlangen-CSS (lädt mit der
+   Wiedergabeseite und bleibt geladen) setzt im Hochformat bis 43em alle Symbolknöpfe auf
+   background-color: transparent !important; zusammen mit dem schwarzen Symbol ergab das
+   einen dunklen Knopf, der nach dem Tippen hängen blieb (:hover und :focus kleben auf Touch).
+   Darum am Handy: Symbol bleibt hell, nur solange der Finger drückt eine dezente helle Fläche
+   wie bei den übrigen Symbolknöpfen am Handy. Der Desktop behält weiß mit schwarzem Symbol. */
+.layout-mobile .videoOsdBottom .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .osdHeader .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .nowPlayingBar .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .playlistSectionButton .paper-icon-button-light:hover:not(:disabled),
+.layout-mobile .videoOsdBottom .paper-icon-button-light.show-focus:focus,
+.layout-mobile .osdHeader .paper-icon-button-light.show-focus:focus,
+.layout-mobile .nowPlayingBar .paper-icon-button-light.show-focus:focus,
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light.show-focus:focus,
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light.show-focus:focus,
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light.show-focus:focus,
+.layout-mobile .playlistSectionButton .paper-icon-button-light.show-focus:focus,
+.layout-mobile .videoOsdBottom .paper-icon-button-light:focus,
+.layout-mobile .osdHeader .paper-icon-button-light:focus,
+.layout-mobile .nowPlayingBar .paper-icon-button-light:focus,
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light:focus,
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light:focus,
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light:focus,
+.layout-mobile .playlistSectionButton .paper-icon-button-light:focus {
+    background-color: transparent !important;
+    color: inherit !important;
+    transform: none !important;
+}
+
+.layout-mobile .videoOsdBottom .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .osdHeader .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .nowPlayingBar .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light:active:not(:disabled),
+.layout-mobile .playlistSectionButton .paper-icon-button-light:active:not(:disabled) {
+    background-color: hsla(0, 0%, 100%, 0.16) !important;
+    color: inherit !important;
+    transform: none !important;
+}
+
+/* Aktive Schalter (Wiederholen, Zufall) behalten dabei ihre Akzentfarbe */
+.layout-mobile .videoOsdBottom .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .videoOsdBottom .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .videoOsdBottom .paper-icon-button-light.buttonActive:active,
+.layout-mobile .osdHeader .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .osdHeader .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .osdHeader .paper-icon-button-light.buttonActive:active,
+.layout-mobile .nowPlayingBar .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .nowPlayingBar .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .nowPlayingBar .paper-icon-button-light.buttonActive:active,
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .nowPlayingInfoButtons .paper-icon-button-light.buttonActive:active,
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .nowPlayingSecondaryButtons .paper-icon-button-light.buttonActive:active,
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .nowPlayingPageUserDataButtonsTitle .paper-icon-button-light.buttonActive:active,
+.layout-mobile .playlistSectionButton .paper-icon-button-light.buttonActive:hover,
+.layout-mobile .playlistSectionButton .paper-icon-button-light.buttonActive:focus,
+.layout-mobile .playlistSectionButton .paper-icon-button-light.buttonActive:active {
+    color: var(--accentColor) !important;
+}
+
+/* player-steuerung-mittig: Wiedergabe-Knöpfe groß in der Bildmitte */
+/* Wiedergabe-Gruppe (das erste div[dir=ltr] in .buttons) groß in die Bildmitte.
+   Sie bleibt im DOM der Bedienleiste: Jellyfin blendet .videoOsdBottom per opacity aus
+   (.videoOsdBottom-hidden) und danach per .hide, beides nimmt die Gruppe mit.
+   position: fixed bezieht sich auf die Player-Seite (.mainAnimatedPage, contain: layout),
+   die das ganze Fenster füllt. */
+.videoOsdBottom .buttons {
+    justify-content: flex-end;
+}
+
+.videoOsdBottom .buttons > div[dir="ltr"] {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    font-size: 1.6em;
+    white-space: nowrap;
+    /* Lücken zwischen den Knöpfen gehören zum Bild: Klick dort pausiert wie bei Jellyfin */
+    pointer-events: none;
+    filter: drop-shadow(0 0 0.3em hsla(0, 0%, 0%, 0.55));
+}
+
+.videoOsdBottom .buttons > div[dir="ltr"] > .paper-icon-button-light {
+    pointer-events: auto;
+    margin: 0;
+}
+
+/* Play/Pause etwas größer als die anderen (ElegantFin: 2em in der Leiste) */
+.videoOsdBottom .buttons > div[dir="ltr"] > .btnPause {
+    font-size: 1.5em;
+    margin: 0 0.15em;
+}
+
+/* Handy und kleine Fenster: etwas kleiner */
+@media (max-width: 43em) {
+    .videoOsdBottom .buttons > div[dir="ltr"] {
+        font-size: 1.25em;
+        gap: 0.3em;
+    }
+}
+
+/* player-ohne-endet-um: „Endet um“ im Player weg */
+/* „Endet um …“ ausblenden. Der Behälter .osdTimeText bleibt, er schiebt mit margin-right: auto die Knöpfe nach rechts. */
+.videoOsdBottom .endsAtText {
+    display: none !important;
+}
+
+/* player-ohne-herz: Herz (Favorit) im Player weg */
+/* Favoriten-Knopf im Video-Player ausblenden */
+.videoOsdBottom .btnUserRating {
+    display: none !important;
+}
+
+/* player-lautstaerke-aufklappen: Lautstärke als aufklappender, senkrechter Regler */
+/* Lautstärke: nur der Lautsprecher, der Regler klappt bei Klick senkrecht darüber auf (Klasse vom Skript). */
+:root {
+    --werkstatt-lautstaerke: 1;
+}
+
+.videoOsdBottom .volumeButtons {
+    position: relative;
+    margin: 0;
+}
+
+.videoOsdBottom .osdVolumeSliderContainer {
+    display: none;
+}
+
+/* Waagerechter Regler, um seine linke obere Ecke um -90° gedreht: Lauter ist oben.
+   Die Ecke sitzt mittig über dem Lautsprecher, translate rückt ihn 0.6em nach oben und mittig. */
+.videoOsdBottom .volumeButtons.werkstattVolumeOpen > .osdVolumeSliderContainer {
+    display: flex;
+    align-items: center;
+    position: absolute;
+    left: 50%;
+    top: 0;
+    z-index: 5;
+    box-sizing: border-box;
+    width: 8.5em;
+    height: 2.6em;
+    margin: 0;
+    padding: 0 1em;
+    flex-grow: 0;
+    transform-origin: 0 0;
+    transform: rotate(-90deg) translate(0.6em, -50%);
+    /* Kein Kasten: nur Balken und Kreis, ein weicher Schatten hält beides auf hellem Bild sichtbar */
+    background: none;
+    border: 0;
+    box-shadow: none;
+    filter: drop-shadow(0 0 0.25em hsla(0, 0%, 0%, 0.6));
+}
+
+/* Balken und Blasenspur auf die Breite des Reglers (ohne den Innenabstand) */
+.videoOsdBottom .werkstattVolumeOpen > .osdVolumeSliderContainer > .mdl-slider-background-flex-container,
+.videoOsdBottom .werkstattVolumeOpen > .osdVolumeSliderContainer > .sliderBubbleTrack {
+    left: 1em;
+    right: auto;
+    width: calc(100% - 2em);
+    margin: 0;
+}
+
+/* Jellyfins Blase rechnet mit der waagerechten Mausposition, gedreht zeigt sie Unsinn. Die Prozentzahl übernimmt. */
+.videoOsdBottom .werkstattVolumeOpen .sliderBubble {
+    display: none !important;
+}
+
+/* Prozentzahl ohne Kasten rechts neben dem Kreis, nur beim Ziehen oder Überfahren.
+   Höhe des Kreises über dem Lautsprecher: 0.6em Abstand + 1em Innenabstand + halber Kreis
+   + Anteil × (6.5em Balken minus Kreis). Den Anteil setzt das Skript als --werkstatt-anteil. */
+.videoOsdBottom .werkstattVolumeValue {
+    display: none;
+}
+
+.videoOsdBottom .werkstattVolumeOpen.werkstattVolumeDrag > .werkstattVolumeValue,
+.videoOsdBottom .werkstattVolumeOpen:has(> .osdVolumeSliderContainer:hover) > .werkstattVolumeValue {
+    display: block;
+    position: absolute;
+    left: calc(50% + 1.2em);
+    bottom: calc(100% + 1.6em + var(--wsThumbSize, 0.6em) / 2 + (6.5em - var(--wsThumbSize, 0.6em)) * var(--werkstatt-anteil, 0.5));
+    transform: translateY(50%);
+    z-index: 5;
+    color: #fff;
+    text-shadow: 0 0 0.3em hsla(0, 0%, 0%, 0.8), 0 0 0.1em hsla(0, 0%, 0%, 0.8);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Lautsprecher bleibt markiert, solange der Regler offen ist */
+.videoOsdBottom .volumeButtons.werkstattVolumeOpen > .buttonMute {
+    background-color: var(--wsIconHoverBg, #fff) !important;
+    color: var(--wsIconHoverColor, #000) !important;
+}
+
+/* player-spuren-im-menue: Untertitel und Tonspur im Einstellungsmenü */
+/* Untertitel- und Tonspur-Knopf unsichtbar, aber im Layout: Das Skript legt sie über das Zahnrad,
+   damit Jellyfin seine Auswahl dort ausrichtet. Jellyfins .hide (keine Spuren) wirkt weiter. */
+:root {
+    --werkstatt-spuren: 1;
+}
+
+.videoOsdBottom .btnSubtitles,
+.videoOsdBottom .btnAudio {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    margin: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* player-restzeit-umschalten: Zeit rechts: Klick wechselt Restzeit und Länge */
+/* Zeit rechts der Zeitleiste als anklickbar erkennbar machen (Jellyfin schaltet bei Klick selbst um) */
+:root {
+    --werkstatt-restzeit: 1;
+}
+
+.videoOsdBottom .osdDurationText {
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .videoOsdBottom .osdDurationText:hover {
+        color: #fff;
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+    }
+}
+
+/* menue-ohne-wiedergabeinfos: „Wiedergabeinformationen“ aus dem Menü */
+/* Eintrag „Wiedergabeinformationen“ im Einstellungsmenü des Players ausblenden */
+.actionSheet .actionSheetMenuItem[data-id="stats"] {
+    display: none !important;
+}
+
+/* musikleiste-knoepfe: Musikleiste: Wiederholen, Zurück, Pause, Weiter, Zufall */
+/* Zeitleiste höher: Jellyfin legt ihre Mitte auf die Oberkante der Leiste (top: -0.56em), der Kreis
+   berührte dann das kleine Cover. Um --wsBarTrackLift höher (Wunsch: „Der Balken soll höher“). */
+:root:not(.layout-mobile) .nowPlayingBar .nowPlayingBarPositionContainer {
+    top: calc(-0.56em - var(--wsBarTrackLift, 0.35em));
+}
+
+/* Musikleiste: Stopp weg, Zeit am rechten Ende (dorthin hängt sie das Skript) */
+:root {
+    --werkstatt-musikleiste: 1;
+}
+
+.nowPlayingBar .nowPlayingBarCenter .stopButton {
+    display: none !important;
+}
+
+.nowPlayingBar .nowPlayingBarRight > .nowPlayingBarCurrentTime {
+    display: inline-block;
+    padding: 0 0.6em 0 0.75em;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 50em) {
+    .nowPlayingBar .nowPlayingBarRight > .nowPlayingBarCurrentTime {
+        display: none;
+    }
+}
+
+/* wiedergabeseite-knoepfe: Wiedergabeseite: Knöpfe wie in der Musikleiste */
+/* Aktuelle Wiedergabe (nur Musik, dort setzt Jellyfin .hideVideoButtons):
+   Hauptreihe = Wiederholen, Zurück, Pause, Weiter, Zufall */
+.hideVideoButtons .nowPlayingInfoButtons .btnRewind,
+.hideVideoButtons .nowPlayingInfoButtons .btnFastForward,
+.hideVideoButtons .nowPlayingInfoButtons .btnStop {
+    display: none !important;
+}
+
+/* Am Desktop blendet Jellyfin Wiederholen und Zufall in der Hauptreihe aus und zeigt sie rechts daneben */
+.layout-desktop .hideVideoButtons .nowPlayingInfoButtons .btnRepeat,
+.layout-desktop .hideVideoButtons .nowPlayingInfoButtons .btnShuffleQueue,
+.layout-tv .hideVideoButtons .nowPlayingInfoButtons .btnRepeat,
+.layout-tv .hideVideoButtons .nowPlayingInfoButtons .btnShuffleQueue {
+    display: inline-flex;
+}
+
+.hideVideoButtons .nowPlayingSecondaryButtons .btnRepeat,
+.hideVideoButtons .nowPlayingSecondaryButtons .btnShuffleQueue {
+    display: none !important;
+}
+
+/* warteschlange-ohne-animation: Warteschlange: Cover bleibt, Titel in Akzentfarbe statt Equalizer */
+/* Laufender Titel in der Warteschlange: Cover statt Equalizer-GIF, Titel in Akzentfarbe.
+   Jellyfin setzt das GIF mit !important, die Pausen-Fassung mit zwei Klassen; beides wird hier übertroffen.
+   Das Cover setzt das Skript als Inline-Stil mit !important, der schlägt jedes Stylesheet. */
+:root {
+    --werkstatt-warteschlange: 1;
+}
+
+.listItem .playlistIndexIndicatorImage,
+.listItem .playlistIndexIndicatorImage.playlistIndexIndicatorPausedImage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: none !important;
+    background-color: var(--selectorBackgroundColorAlpha, hsla(0, 0%, 100%, 0.08)) !important;
+    background-blend-mode: normal;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
+
+/* Dezentes Symbol: kleiner dunkler Kreis mittig auf dem Cover */
+.listItem .playlistIndexIndicatorImage::after {
+    content: "\e037";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    background: hsla(0, 0%, 0%, 0.5);
+    font-family: var(--iconPack, "Material Icons"), "Material Icons";
+    font-feature-settings: "liga";
+    font-variation-settings: "FILL" 1;
+    font-size: 1em;
+    line-height: 1;
+    color: #fff;
+}
+
+.listItem .playlistIndexIndicatorImage.playlistIndexIndicatorPausedImage::after {
+    content: "\e034";
+}
+
+.listItem[data-type="Audio"]:has(.playlistIndexIndicatorImage) .listItemBodyText {
+    color: var(--accentColor);
+}
+
+/* player-blasen-klein: Desktop: kleine Blasen über den Reglern im Player */
+/* Desktop: Blase über den Reglern im Player (Jellyfin: h1.sliderBubbleText, ElegantFin 1.5em Schrift,
+   Innenabstand 0.5em 0.75em der großen Schrift, Ecken --largeRadius). Die Blase mit Vorschaubild (.chapterThumbContainer)
+   hat keinen .sliderBubbleText und bleibt. */
+:root:not(.layout-mobile) :is(.nowPlayingBar, #nowPlayingPage, .videoOsdBottom) .sliderBubble:has(> .sliderBubbleText) {
+    border-radius: var(--smallRadius, 0.5em);
+}
+
+:root:not(.layout-mobile) :is(.nowPlayingBar, #nowPlayingPage, .videoOsdBottom) .sliderBubbleText {
+    font-size: 0.95em;
+    font-weight: 500;
+    line-height: 1.2;
+    padding: 0.3em 0.6em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* wiedergabeliste-ohne-speichern: Desktop: Speichern-Knopf der Wiedergabeliste weg */
+/* Desktop: Speichern über der Warteschlange ausblenden (remotecontrol.js nimmt ihm am Desktop das .hide) */
+:root:not(.layout-mobile) #nowPlayingPage .playlistSectionButton .btnSavePlaylist {
+    display: none !important;
+}
+
+/* wiedergabeseite-schliessen: Desktop: Knopf zum Schließen der Wiedergabeseite */
+/* Desktop: Schließen-Knopf oben rechts im Player-Kasten (setzt das Skript ein).
+   .nowPlayingInfoContainer ist am Desktop position: sticky (ElegantFin), der Knopf richtet sich daran aus. */
+:root {
+    --werkstatt-schliessen: 1;
+}
+
+.werkstattSchliessen {
+    display: none;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattSchliessen {
+    display: inline-flex;
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    z-index: 3;
+    margin: 0;
+    font-size: 1.2em;
+    border-radius: 50%;
+}
+
+/* Platz für den Knopf, damit lange Titel nicht darunter laufen */
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer:has(> .werkstattSchliessen) .nowPlayingInfoControls .infoContainer {
+    padding-right: 2.5em;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattSchliessen:hover {
+        background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+        color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+        transform: none !important;
+    }
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattSchliessen:active {
+    background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+    color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+    transform: none !important;
+}
+
+/* player-sheets-mobil: Handy: Menüs und „Als Nächstes“ als Sheet unten */
+/* Handy, Player: actionSheets (Einstellungen, Untertitel, Tonspur) als Sheet unten.
+   Gleiche Werte wie F1 in tweaks.js; dort gilt :not(:has(.videoPlayerContainer)), hier das Gegenstück.
+   !important, weil Jellyfin die Lage per Inline-Stil am Knopf setzt. */
+:root.layout-mobile:has(.videoPlayerContainer) .dialogContainer > .actionSheet.actionsheet-not-fullscreen {
+    position: fixed !important;
+    top: auto !important;
+    right: var(--wsSheetGap, 0.75em) !important;
+    bottom: max(env(safe-area-inset-bottom), var(--wsSheetGap, 0.75em)) !important;
+    left: var(--wsSheetGap, 0.75em) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 90%;
+    margin: 0 !important;
+    background: var(--wsMenuBg, var(--drawerColor)) !important;
+    border: var(--wsMenuBorder, var(--defaultBorder)) !important;
+    border-radius: var(--wsMenuRadius, var(--largeRadius)) !important;
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+}
+
+/* „Als Nächstes“ genauso unten über die volle Breite */
+.layout-mobile .upNextContainer {
+    left: var(--wsSheetGap, 0.75em);
+    right: var(--wsSheetGap, 0.75em);
+    bottom: max(env(safe-area-inset-bottom), var(--wsSheetGap, 0.75em));
+    width: auto;
+    max-width: none;
+    margin: 0 !important;
+    box-sizing: border-box;
+    background: var(--wsMenuBg, var(--headerColor)) !important;
+    border: var(--wsMenuBorder, var(--defaultBorder)) !important;
+    border-radius: var(--wsMenuRadius, var(--largeRadius));
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+}
+
+/* Inhalt linksbündig wie in den Menüs, die Knöpfe bleiben wie bei Jellyfin rechts */
+.layout-mobile .upNextContainer .upNextDialog-title,
+.layout-mobile .upNextContainer .upNextDialog-buttons {
+    width: auto;
+}
+
+/* player-vorschau-mobil: Handy: kleineres Vorschaubild beim Ziehen */
+/* Handy: Vorschau in der Blase der Zeitleiste kleiner.
+   Trickplay: Jellyfin setzt Breite und Höhe der Kachel als Inline-Pixel (meist 320 × 180) und verschiebt
+   das Sammelbild in Pixeln; verkleinern lässt sich das nur als Ganzes, darum zoom (320 px × 0.5 ≈ 40 % Breite).
+   Kapitelbilder (.chapterThumb) haben feste Maße aus Jellyfins CSS (30vw bzw. 30vh), die werden ersetzt. */
+.layout-mobile .videoOsdBottom .chapterThumbWrapper {
+    zoom: 0.5;
+}
+
+.layout-mobile .videoOsdBottom .chapterThumb {
+    width: 40vw;
+    min-width: 40vw;
+    height: 22.5vw;
+}
+
+.layout-mobile .videoOsdBottom .chapterThumbTextContainer {
+    padding: 0 0.5em 0.4em;
+}
+
+.layout-mobile .videoOsdBottom .chapterThumbText {
+    font-size: 0.85em;
+    padding: 0.1em 0;
+}
+
+.layout-mobile .videoOsdBottom h2.chapterThumbText {
+    font-size: 1em;
+}
+
+.layout-mobile .videoOsdBottom .sliderBubbleText {
+    font-size: 1.1em;
+}
+
+/* player-ueberspringen-mobil: Handy: kleinerer „Vorspann überspringen“-Knopf */
+/* Handy: Überspringen-Knopf kleiner (Jellyfin: 1.2em Schrift, 12px 20px Innenabstand) */
+.layout-mobile .skip-button {
+    font-size: 0.95em;
+    padding: 0.5em 0.9em;
+    margin-right: var(--wsSheetGap, 0.75em);
+}
+
+.layout-mobile .skip-button .material-icons {
+    font-size: 1.2em;
+}
+
+/* musikleiste-mobil: Handy: Musikleiste als schwebende Karte mit allen Knöpfen */
+/* Handy: Musikleiste als schwebende Karte. Die Leiste liegt in .appfooter; der Fuß selbst wird
+   durchsichtig und klickdurchlässig, die Karte bekommt Fläche, Rand, Ecken und Schatten der Menüs. */
+:root {
+    --werkstatt-musikleiste-mobil: 1;
+}
+
+.layout-mobile .appfooter {
+    background: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding-bottom: 0;
+    pointer-events: none;
+}
+
+.layout-mobile .appfooter > .nowPlayingBar {
+    pointer-events: auto;
+    margin: 0 var(--wsSheetGap, 0.75em) max(env(safe-area-inset-bottom), var(--wsSheetGap, 0.75em));
+    overflow: hidden;
+    background: var(--wsMenuBg, var(--drawerColor));
+    border: var(--wsMenuBorder, var(--defaultBorder));
+    border-radius: var(--wsMenuRadius, var(--largeRadius));
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+    backdrop-filter: var(--blurLargest, blur(20px));
+}
+
+/* Ohne Gleiten (Wunsch: „Der Miniplayer soll einfach wegploppen, keine Animation“). Jellyfin schiebt
+   die Leiste per transform 200 ms weg und versteckt sie erst am Ende der Bewegung (transitionend),
+   darum eine fast unmerklich kurze statt gar keiner Bewegung. Weggeschoben ganz unsichtbar: die
+   schwebende Karte hat unten Abstand und Schatten, die ragten sonst noch ins Bild. */
+.layout-mobile .nowPlayingBar {
+    transition-duration: 0.01s !important;
+}
+
+.layout-mobile .nowPlayingBar.nowPlayingBar-hidden {
+    visibility: hidden;
+}
+
+/* Keine Zeitleiste in der Leiste */
+.layout-mobile .nowPlayingBar .nowPlayingBarPositionContainer {
+    display: none !important;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarTop {
+    height: auto;
+    min-height: 3.8em;
+    padding: 0.25em 0.4em;
+    gap: 0.25em;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarInfoContainer {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingImage {
+    width: 3em;
+    height: 3em;
+}
+
+/* Knöpfe wie am Desktop: die Mitte zeigen (Jellyfin versteckt sie am Handy), neben dem Titel statt darüber */
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter,
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter.hide {
+    display: flex !important;
+    position: static;
+    flex: 0 0 auto;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .stopButton,
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .nowPlayingBarCurrentTime {
+    display: none !important;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .btnShuffleQueue,
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .toggleRepeatButton:not(.hide) {
+    display: inline-flex !important;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .mediaButton {
+    margin: 0;
+    padding: 0.35em;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .playPauseButton {
+    font-size: 1.5em;
+    padding: 0.2em;
+}
+
+/* Wiederholen und Zufall so groß wie Zurück und Weiter: ihre Symbole füllen das Feld stärker aus
+   als die schmalen Pfeile, darum etwas kleiner gesetzt */
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .toggleRepeatButton > .material-icons,
+.layout-mobile .nowPlayingBar .nowPlayingBarCenter .btnShuffleQueue > .material-icons {
+    font-size: 1.05em;
+}
+
+/* Pause steht jetzt in der Mitte; rechts nicht doppelt */
+.layout-mobile .nowPlayingBar .nowPlayingBarRight .playPauseButton {
+    display: none !important;
+}
+
+.layout-mobile .nowPlayingBar .nowPlayingBarRight {
+    margin: 0;
+}
+
+/* player-fest: Wiedergabeseite: Player bleibt beim Scrollen stehen */
+/* Desktop, Wiedergabeseite: Klebekante an der Ausgangsstelle des Players (misst das Skript) */
+:root {
+    --werkstatt-player-fest: 1;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer {
+    top: var(--werkstatt-player-oben, 5em);
+}
+
+/* mini-fortschritt: Handy: Fortschritt im Miniplayer */
+/* Handy, Musikleiste: Balken unten in der Karte, nur Anzeige (Skript setzt Element und Füllung) */
+:root {
+    --werkstatt-mini-fortschritt: 1;
+}
+
+.layout-mobile .appfooter > .nowPlayingBar {
+    position: relative;
+}
+
+.layout-mobile .appfooter > .nowPlayingBar:has(> .werkstattMiniFortschritt) .nowPlayingBarTop {
+    padding-bottom: 0.6em;
+}
+
+.layout-mobile .nowPlayingBar > .werkstattMiniFortschritt {
+    position: absolute;
+    right: 0.75em;
+    bottom: 0.3em;
+    left: 0.75em;
+    height: var(--wsTrackHeight, 0.3em);
+    overflow: hidden;
+    border-radius: var(--wsTrackRadius, 999px);
+    background: var(--wsTrackColor, hsla(0, 0%, 100%, 0.2));
+    pointer-events: none;
+}
+
+.layout-mobile .nowPlayingBar > .werkstattMiniFortschritt > div {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--wsFillColor, var(--accentColor));
+    transform: scaleX(0);
+    transform-origin: left center;
+}
+
+/* wiedergabeseite-mobil-liste: Handy: Player, Wiedergabeliste und Songtexte als Karten, die hochfahren */
+/* Handy, Wiedergabeseite. Offen ist die Liste, wenn Jellyfin #playlist das .hide genommen hat
+   (remotecontrol.js, Knopf „Wiedergabeliste“); am Desktop hat sie nie .hide, darum nur .layout-mobile. */
+:root {
+    --werkstatt-wiedergabeseite: 1;
+}
+
+/* Lautstärke in der Knopfleiste unten weg */
+.layout-mobile #nowPlayingPage .playlistSectionButton .volumecontrol {
+    display: none !important;
+}
+
+/* Songtext-Knopf in der Knopfleiste (dorthin hängt ihn das Skript), bei Musik sichtbar */
+.layout-mobile .hideVideoButtons .playlistSectionButton .btnLyrics,
+.layout-mobile .hideVideoButtons .playlistSectionButton .btnLyrics.hide {
+    display: inline-flex !important;
+    font-size: larger;
+    margin: 0;
+}
+
+/* Offen: #playlist wird zum Sheet von kurz unter der Kopfzeile bis ganz unten. Jellyfins Knopfleiste
+   (Wiedergabeliste, Songtext, Mehr; Speichern und Lautstärke sind weg) bleibt eine Ebene darunter
+   stehen: verdeckt, solange das Sheet offen ist, und schon sichtbar, sobald man es herunterzieht.
+   Sheet ist die Liste selbst und nicht .playlistSection: deren Knopfleiste ist position: fixed und
+   würde sonst mit dem Sheet verschoben. --werkstatt-kopf misst das Skript.
+   Jellyfin setzt die Liste als inline-block, zusammen mit .itemsContainer { margin: 0 auto }
+   schrumpft sie sonst auf Inhaltsbreite und steht mittig; darum display, width und margin fest. */
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) #playlist {
+    position: fixed !important;
+    top: calc(var(--werkstatt-kopf, calc(var(--appBarHeight, 5em) + env(safe-area-inset-top))) + var(--wsSheetGap, 0.75em)) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 2;
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+    padding: 0 0 max(env(safe-area-inset-bottom), 0.5em) !important;
+    overflow-x: hidden;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    background: var(--wsMenuBg, var(--drawerColor)) !important;
+    border: var(--wsMenuBorder, var(--defaultBorder));
+    border-bottom: 0;
+    border-radius: var(--wsMenuRadius, var(--largeRadius)) var(--wsMenuRadius, var(--largeRadius)) 0 0;
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+    backdrop-filter: var(--blurLargest, blur(20px)) !important;
+}
+
+/* Die Leiste unter dem Sheet wie im geschlossenen Zustand: Jellyfin nimmt ihr beim Öffnen
+   playlistSectionButtonTransparent, ElegantFin gibt ihr dann eine graue Fläche (--drawerColor),
+   einen Rand oben und Unschärfe. Das wirkte beim Herunterziehen wie graue Ränder um die Knöpfe. */
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) .playlistSectionButton {
+    z-index: 1;
+    background: transparent !important;
+    border-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) .playlistSectionButton .btnSavePlaylist {
+    display: none !important;
+}
+
+/* Griff oben im Sheet: weißer kurzer Strich mittig, bleibt beim Scrollen stehen.
+   Das Skript setzt ihn als Element ein (touch-action: none, sonst übernimmt der Browser die Geste);
+   ohne Skript zeichnet ihn ein Pseudo-Element. */
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) #playlist > .werkstattListeGriff {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 1.5em;
+    margin-bottom: 0.25em;
+    background: linear-gradient(hsla(0, 0%, 100%, 0.85), hsla(0, 0%, 100%, 0.85)) center / 2.75em 0.3em no-repeat, var(--wsMenuBg, var(--drawerColor));
+    touch-action: none;
+    cursor: grab;
+}
+
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) #playlist:not(:has(> .werkstattListeGriff))::before {
+    content: "";
+    display: block;
+    height: 1.5em;
+    background: linear-gradient(hsla(0, 0%, 100%, 0.85), hsla(0, 0%, 100%, 0.85)) center / 2.75em 0.3em no-repeat;
+}
+
+/* Liste zu: derselbe Griff oben unter der Kopfzeile, zum Verkleinern der Seite (Skript) */
+.layout-mobile #nowPlayingPage > .werkstattSeitenGriff {
+    position: fixed;
+    top: var(--werkstatt-kopf, calc(var(--appBarHeight, 5em) + env(safe-area-inset-top)));
+    right: 0;
+    left: 0;
+    z-index: 5;
+    height: 1.5em;
+    background: linear-gradient(hsla(0, 0%, 100%, 0.85), hsla(0, 0%, 100%, 0.85)) center / 2.75em 0.3em no-repeat;
+    touch-action: none;
+    cursor: grab;
+}
+
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) > .werkstattSeitenGriff {
+    display: none;
+}
+
+/* Titel auf volle Breite: ElegantFin rückt die Zeilen am Handy je 1em ein (#playlist .listItem),
+   im Sheet mit eigenem Rand reicht der halbe Abstand; der Text darf den ganzen Rest der Zeile nutzen */
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) #playlist .listItem[data-type="Audio"] {
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+}
+
+:root.layout-mobile #nowPlayingPage:has(#playlist:not(.hide)) #playlist .listItemBody {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding-right: 0.25em;
+}
+
+/* ---------- Karten (Wunsch vom 23.10.2026): Player solide über allem, darunter die vorige Seite;
+   Player, Wiedergabeliste und Songtexte fahren beim Öffnen von unten hoch. */
+
+/* Ebenen, solange Player oder Songtexte offen sind: Kopfzeile (Jellyfin: 999) über Songtexten (998)
+   über Player (997) über Musikleiste (sonst 1201 !important) über allen anderen Seiten (ohne z-index).
+   So liegt beim Herunterziehen die Seite samt Miniplayer unter dem Player. Dialoge liegen weit darüber. */
+:root.layout-mobile:has(#nowPlayingPage:not(.hide)) .appfooter,
+:root.layout-mobile:has(#lyricPage:not(.hide)) .appfooter {
+    z-index: 996 !important;
+}
+
+:root.layout-mobile #nowPlayingPage {
+    z-index: 997;
+}
+
+:root.layout-mobile #lyricPage {
+    z-index: 998;
+}
+
+/* Hintergrundbild aus: über der Kopfzeile stünde sonst ein Streifen Bild über der soliden Karte */
+:root.layout-mobile:has(#nowPlayingPage:not(.hide)) .backdropContainer,
+:root.layout-mobile:has(#lyricPage:not(.hide)) .backdropContainer {
+    visibility: hidden;
+}
+
+@keyframes werkstattHochfahren {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+/* Gleiche Bewegung unter anderem Namen: für schon sichtbare Elemente (Klasse werkstattHoch vom
+   Skript); ein gleicher Name würde die Animation nicht neu starten */
+@keyframes werkstattHochfahrenNeu {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+/* Player und Songtexte fahren hoch, sobald sie sichtbar werden; data-werkstatt-ruhig setzt das
+   Skript, wo die Seite schon dalag (zurück von den Songtexten, unter eine andere Karte gelegt) */
+:root.layout-mobile #nowPlayingPage:not(.hide):not([data-werkstatt-ruhig]),
+:root.layout-mobile #lyricPage:not(.hide):not([data-werkstatt-ruhig]) {
+    animation: werkstattHochfahren 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+:root.layout-mobile .werkstattHoch {
+    animation: werkstattHochfahrenNeu 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root.layout-mobile #nowPlayingPage,
+    :root.layout-mobile #lyricPage,
+    :root.layout-mobile .werkstattHoch {
+        animation: none !important;
+    }
+}
+
+/* Player als solide Karte: Fläche erst ab der Kopfzeile (::before), so wandert beim Ziehen kein
+   leerer Streifen mit. ElegantFins halbdurchsichtiger Verlauf auf der Seite fällt weg. Der Inhalt
+   beginnt direkt unter dem Griff (Jellyfin: padding-top 7em für die ganze Seite). */
+:root.layout-mobile #nowPlayingPage {
+    isolation: isolate;
+    background: none !important;
+    padding-top: calc(var(--werkstatt-kopf, calc(var(--appBarHeight, 5em) + env(safe-area-inset-top))) + 1.75em) !important;
+}
+
+:root.layout-mobile #nowPlayingPage::before {
+    content: "";
+    position: absolute;
+    top: var(--werkstatt-kopf, calc(var(--appBarHeight, 5em) + env(safe-area-inset-top)));
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    background: var(--darkerGradientPoint);
+    border-radius: var(--wsMenuRadius, var(--largeRadius)) var(--wsMenuRadius, var(--largeRadius)) 0 0;
+    pointer-events: none;
+}
+
+/* Schatten nur, solange die Karte bewegt wird (in Ruhe hat sie die Farbe des Hintergrunds) */
+:root.layout-mobile #nowPlayingPage.werkstattBewegt::before {
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+}
+
+/* Songtexte als Karte wie die Wiedergabeliste: von kurz unter der Kopfzeile bis ganz unten, oben
+   abgerundet, Fläche, Rand und Schatten der Menüs, Griff oben. Die Karte scrollt selbst, so
+   bleibt der Player darunter stehen (Jellyfins Mitlaufen sucht sich den scrollenden Behälter). */
+:root.layout-mobile #lyricPage {
+    top: calc(var(--werkstatt-kopf, calc(var(--appBarHeight, 5em) + env(safe-area-inset-top))) + var(--wsSheetGap, 0.75em)) !important;
+    flex-direction: column;
+    align-items: stretch;
+    box-sizing: border-box;
+    padding: 0 0.5em max(env(safe-area-inset-bottom), 0.5em) !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--wsMenuBg, var(--drawerColor));
+    border: var(--wsMenuBorder, var(--defaultBorder));
+    border-bottom: 0;
+    border-radius: var(--wsMenuRadius, var(--largeRadius)) var(--wsMenuRadius, var(--largeRadius)) 0 0;
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+    backdrop-filter: var(--blurLargest, blur(20px));
+}
+
+:root.layout-mobile #lyricPage > .werkstattTextGriff {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    flex: 0 0 auto;
+    height: 1.5em;
+    margin: 0 -0.5em 0.25em;
+    background: linear-gradient(hsla(0, 0%, 100%, 0.85), hsla(0, 0%, 100%, 0.85)) center / 2.75em 0.3em no-repeat, var(--wsMenuBg, var(--drawerColor));
+    touch-action: none;
+    cursor: grab;
+}
+
+:root.layout-mobile #lyricPage:not(:has(> .werkstattTextGriff))::before {
+    content: "";
+    flex: 0 0 auto;
+    height: 1.5em;
+    background: linear-gradient(hsla(0, 0%, 100%, 0.85), hsla(0, 0%, 100%, 0.85)) center / 2.75em 0.3em no-repeat;
+}
+
+/* Liegen die Songtexte über dem Player, gehört der Strich zur Karte darüber; der des Players ist
+   weg (wie bei offener Wiedergabeliste) */
+:root.layout-mobile:has(#lyricPage:not(.hide)) #nowPlayingPage > .werkstattSeitenGriff {
+    display: none;
+}
+
+/* Bei den Songtexten kein Miniplayer (Jellyfin zeigt ihn dort sonst an) */
+:root.layout-mobile:has(#lyricPage:not(.hide)) .appfooter > .nowPlayingBar {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* warteschlange-wischen-mobil: Handy: Titel aus der Wiedergabeliste wischen */
+/* Handy, Wiedergabeliste: Entfernen und ⋮ weg (listview.js: rightButtons „remove“ und moreButton),
+   entfernt wird per Wischen nach links (Skript). */
+:root {
+    --werkstatt-wischen: 1;
+}
+
+.layout-mobile #nowPlayingPage #playlist .listItemButton[data-action="custom"][data-customaction="remove"],
+.layout-mobile #nowPlayingPage #playlist .listItemButton[data-action="menu"] {
+    display: none !important;
+}
+
+/* Senkrecht scrollt der Browser, waagerecht gehört die Geste dem Skript */
+.layout-mobile #nowPlayingPage #playlist .listItem {
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.layout-mobile #nowPlayingPage #playlist .listItem.werkstattWischt {
+    position: relative;
+    z-index: 1;
+    will-change: transform;
+}
+
+/* Rote Fläche rechts hinter der Zeile, so breit wie der Zug (Lage und Breite setzt das Skript) */
+.layout-mobile #nowPlayingPage #playlist > .werkstattWischRot {
+    position: absolute;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding-right: 1em;
+    border-radius: var(--smallRadius, 0.5em);
+    background: hsla(0, 70%, 45%, 0.55);
+    color: #fff;
+    pointer-events: none;
+    transition: background-color 0.15s;
+}
+
+.layout-mobile #nowPlayingPage #playlist > .werkstattWischRot::after {
+    content: "\e872";
+    font-family: var(--iconPack, "Material Icons"), "Material Icons";
+    font-feature-settings: "liga";
+    font-size: 1.5em;
+    line-height: 1;
+    opacity: 0.55;
+    transform: scale(0.85);
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.layout-mobile #nowPlayingPage #playlist > .werkstattWischRot.werkstattWischGenug {
+    background: var(--btnDeleteColor, rgb(169, 29, 29));
+}
+
+.layout-mobile #nowPlayingPage #playlist > .werkstattWischRot.werkstattWischGenug::after {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* farbwaehler: Theme-Farbe und Grundfarbe pro Benutzer wählen */
+/* Abschnitt „Theme-Farbe“ auf der Seite Einstellungen → Anzeige (Skript des Schalters „farbwaehler“).
+   Klassischer Farbwähler, ohne das je Gerät verschiedene System-Popup von input type="color":
+   Feld für Sättigung und Helligkeit (weiß bis Farbton waagerecht, nach schwarz senkrecht) mit rundem
+   Zeiger, darunter der Farbton-Regler als Regenbogen mit Kreis wie bei den übrigen Reglern
+   (--wsThumbSize, --wsThumbShadow), dann Vorschau, Hex-Feld und „Standard“.
+   Das Skript setzt je Element --wkTon (reiner Farbton), --wkX/--wkY (Lage des Zeigers) und
+   --wkFarbe (gewählte Farbe). Am Rechner kompakt (240 × 160 px), am Handy volle Breite.
+   touch-action: none, damit Ziehen mit dem Finger nicht die Seite scrollt. */
+.werkstattAkzentSection {
+    margin-bottom: 1.5em;
+}
+
+.werkstattAkzent-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    width: 240px;
+    max-width: 100%;
+    margin: 0.75em 0 0;
+}
+
+.layout-mobile .werkstattAkzent-box {
+    width: 100%;
+}
+
+.werkstattAkzent-flaeche {
+    position: relative;
+    height: 160px;
+    border-radius: var(--wsMenuRadius, 1em);
+    box-shadow: inset 0 0 0 var(--borderWidth, 0.06em) var(--borderColor, hsl(0, 0%, 25%));
+    background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--wkTon, hsl(25, 100%, 50%)));
+    cursor: crosshair;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none;
+}
+
+.layout-mobile .werkstattAkzent-flaeche {
+    height: min(55vw, 240px);
+}
+
+.werkstattAkzent-flaechenzeiger {
+    position: absolute;
+    left: var(--wkX, 91%);
+    top: var(--wkY, 2%);
+    box-sizing: border-box;
+    width: 1.15em;
+    height: 1.15em;
+    border: 0.16em solid #fff;
+    border-radius: 50%;
+    background: var(--wkFarbe, #f97316);
+    box-shadow: var(--wsThumbShadow, 0 0.05em 0.3em hsla(0, 0%, 0%, 0.4)), inset 0 0 0 0.04em hsla(0, 0%, 0%, 0.25);
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease;
+    pointer-events: none;
+}
+
+.werkstattAkzent-ton {
+    position: relative;
+    height: 1.6em;
+    cursor: pointer;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none;
+}
+
+/* Der Regenbogen: so hoch wie ein Reglerbalken beim Ziehen, mittig in der größeren Tippfläche */
+.werkstattAkzent-ton::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: var(--wsTrackHeightActive, 0.6em);
+    border-radius: var(--wsTrackRadius, 999px);
+    background: linear-gradient(to right, #f00 0%, #ff0 16.667%, #0f0 33.333%, #0ff 50%, #00f 66.667%, #f0f 83.333%, #f00 100%);
+    transform: translateY(-50%);
+}
+
+.werkstattAkzent-tonzeiger {
+    position: absolute;
+    top: 50%;
+    left: var(--wkX, 7%);
+    box-sizing: border-box;
+    width: var(--wsThumbSize, 0.95em);
+    height: var(--wsThumbSize, 0.95em);
+    border-radius: 50%;
+    background: var(--wkTon, hsl(25, 100%, 50%));
+    box-shadow: var(--wsThumbShadow, 0 0.05em 0.3em hsla(0, 0%, 0%, 0.4));
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease;
+    pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .werkstattAkzent-ton:hover .werkstattAkzent-tonzeiger {
+        transform: translate(-50%, -50%) scale(1.12);
+    }
+}
+
+.werkstattAkzent-ton.werkstattAkzent-zieht .werkstattAkzent-tonzeiger,
+.werkstattAkzent-flaeche.werkstattAkzent-zieht .werkstattAkzent-flaechenzeiger {
+    transform: translate(-50%, -50%) scale(1.3);
+}
+
+.werkstattAkzent-flaeche:focus-visible,
+.werkstattAkzent-ton:focus-visible {
+    box-shadow: var(--wsFocusRing, 0 0 0 0.12em #0f0f0f, 0 0 0 0.26em #fff);
+    border-radius: var(--wsMenuRadius, 1em);
+}
+
+.werkstattAkzent-zeile {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.werkstattAkzent-vorschau {
+    flex: 0 0 auto;
+    width: 2.4em;
+    height: 2.4em;
+    border-radius: var(--smallRadius, 0.5em);
+    box-shadow: inset 0 0 0 var(--borderWidth, 0.06em) hsla(0, 0%, 100%, 0.25);
+}
+
+.werkstattAkzent-zeile > .werkstattAkzent-code {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 7.5em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.werkstattAkzent-zeile > .werkstattAkzent-code.werkstattAkzent-ungueltig {
+    border-color: var(--btnDeleteBorderColor, #d95454) !important;
+}
+
+.werkstattAkzent-zeile > .werkstattAkzent-standard {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 0.5em 1em;
+}
+
+.werkstattAkzent-zeile > .werkstattAkzent-standard:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.werkstattAkzent-hinweis {
+    margin-top: 0.75em;
+}
+
+/* Unterüberschriften „Akzentfarbe“ und „Grundfarbe“ */
+.werkstattAkzent-unter {
+    margin: 1em 0 0;
+    font-weight: 600;
+    color: var(--textColor);
+}
+
+/* Grundfarbe: Vorlagen als Kacheln mit kleiner Vorschau (Kopfleiste, Verlauf, zwei Textzeilen).
+   Die Farben der Vorlage setzt das Skript als --wkTon* am Muster. Gewählt: Ring in Akzentfarbe. */
+.werkstattTon-liste {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr));
+    gap: 0.6em;
+    max-width: 40em;
+    margin: 0.75em 0 0;
+}
+
+.werkstattTon-wahl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+    margin: 0;
+    padding: 0.4em;
+    border: 0;
+    border-radius: var(--wsMenuRadius, 1em);
+    background: transparent;
+    color: var(--textColor);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 var(--borderWidth, 0.06em) var(--borderColor, hsl(0, 0%, 25%));
+    transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .werkstattTon-wahl:hover {
+        background: var(--selectorBackgroundColorAlpha, hsla(0, 0%, 20%, 0.5));
+    }
+}
+
+.werkstattTon-wahl[aria-checked="true"] {
+    box-shadow: inset 0 0 0 0.14em var(--accentColor);
+}
+
+.werkstattTon-wahl:focus-visible {
+    outline: none;
+    box-shadow: var(--wsFocusRing, 0 0 0 0.12em #0f0f0f, 0 0 0 0.26em #fff);
+}
+
+.werkstattTon-muster {
+    position: relative;
+    display: block;
+    height: 3.2em;
+    overflow: hidden;
+    border-radius: calc(var(--wsMenuRadius, 1em) - 0.4em);
+    background:
+        linear-gradient(var(--wkTonText), var(--wkTonText)) 0.55em 1.45em / 55% 0.28em no-repeat,
+        linear-gradient(var(--wkTonText), var(--wkTonText)) 0.55em 2.1em / 35% 0.28em no-repeat,
+        linear-gradient(var(--wkTonKopf), var(--wkTonKopf)) 0 0 / 100% 0.85em no-repeat,
+        linear-gradient(180deg, var(--wkTonHell), var(--wkTonDunkel));
+    box-shadow: inset 0 0 0 var(--borderWidth, 0.06em) var(--wkTonRand);
+}
+
+.werkstattTon-name {
+    padding: 0 0.15em 0.1em;
+    font-size: 0.9em;
+    line-height: 1.25;
+}
+
+.werkstattTon-name small {
+    display: block;
+    color: var(--dimTextColor);
+    font-size: 0.85em;
+}
+
+.werkstattTon-hinweis {
+    margin-top: 0.75em;
+}
+
+/* wiedergabe-fortsetzen: Musik nach einem Neustart weiterhören */
+/* Leiste „Weiterhören“ nach einem Neustart (Skript des Schalters „wiedergabe-fortsetzen“).
+   Sieht aus wie die Musikleiste im Pausenzustand, mit einem Balken für die gemerkte Stelle: am
+   Desktop oben wie Jellyfins Zeitleiste, am Handy unten wie im Miniplayer (dünn, eingerückt,
+   gerundet wie auf den Covern angefangener Filme),
+   Cover, Titel, Künstler mit „weiter bei …“, rechts Weiterhören und Verwerfen. Sie liegt wie die
+   echte Leiste in .appfooter und bekommt dort dessen Hintergrund; gibt es keinen Fuß, steht sie
+   selbst unten fest (.werkstattFortsetzen-frei). Die Klassen enthalten bewusst kein „nowPlayingBar“,
+   Jellyfin sucht seine Leiste per getElementsByClassName('nowPlayingBar'). Am Handy schwebt sie
+   als Karte wie die Musikleiste (Schalter „musikleiste-mobil“), mit denselben Variablen. */
+.werkstattFortsetzen {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    box-sizing: border-box;
+    min-height: 4.2em;
+    padding: 0 0.5em 0 0;
+    color: var(--textColor, hsla(0, 0%, 100%, 0.87));
+    text-align: left;
+    pointer-events: auto;
+}
+
+.werkstattFortsetzen[hidden] {
+    display: none !important;
+}
+
+/* Nie neben Jellyfins Musikleiste (Wunsch: „habe ich zwischenzeitlich kurz 2 Wiedergabeleisten“):
+   Ist .nowPlayingBar zu sehen (versteckt trägt sie „hide“, beim Wegschieben „nowPlayingBar-hidden“),
+   bleibt diese Leiste verborgen, sofort und ohne auf die nächste Prüfung des Skripts zu warten. */
+body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortsetzen {
+    display: none !important;
+}
+
+.werkstattFortsetzen-frei {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1201;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--headerColor, #202020);
+    backdrop-filter: var(--blurLargest, blur(20px));
+    -webkit-backdrop-filter: var(--blurLargest, blur(20px));
+}
+
+.werkstattFortsetzen-fortschritt {
+    position: absolute;
+    right: 0.75em;
+    bottom: 0.3em;
+    left: 0.75em;
+    height: var(--wsTrackHeight, 0.3em);
+    overflow: hidden;
+    border-radius: var(--wsTrackRadius, 999px);
+    background: var(--wsTrackColor, hsla(0, 0%, 100%, 0.2));
+    pointer-events: none;
+}
+
+.werkstattFortsetzen-fortschritt > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--wsFillColor, var(--accentColor, #f97316));
+}
+
+.werkstattFortsetzen-haupt {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    align-self: stretch;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.werkstattFortsetzen-haupt:focus-visible {
+    outline: none;
+    box-shadow: var(--wsFocusRing, 0 0 0 0.12em #0f0f0f, 0 0 0 0.26em #fff);
+    border-radius: var(--smallRadius, 0.5em);
+}
+
+.werkstattFortsetzen-bild {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 3.5em;
+    height: 3.5em;
+    margin: 0.25em;
+    border-radius: var(--smallerRadius, 0.375em);
+    background: hsla(0, 0%, 100%, 0.08) center / cover no-repeat;
+    color: var(--dimTextColor, hsla(0, 0%, 100%, 0.5));
+}
+
+.werkstattFortsetzen-bild > .material-icons {
+    font-size: 1.6em;
+}
+
+.werkstattFortsetzen-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0 1em 0 0.5em;
+    font-size: 92%;
+    line-height: 1.35;
+}
+
+.werkstattFortsetzen-titel,
+.werkstattFortsetzen-unter {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.werkstattFortsetzen-unter {
+    color: var(--dimTextColor, hsla(0, 0%, 100%, 0.5));
+    font-variant-numeric: tabular-nums;
+}
+
+/* Weiterhören wie Play/Pause der echten Leiste am Desktop (Schalter „player-knoepfe-einheitlich“):
+   größeres Symbol, aber knapper Innenabstand, sonst wüchse der weiße Kreis beim Überfahren mit der
+   Schrift weit über die Leiste */
+.werkstattFortsetzen > .werkstattFortsetzen-weiter {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 1.75em;
+    padding: 0.32em;
+}
+
+.werkstattFortsetzen > .werkstattFortsetzen-weg {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 1.2em;
+    opacity: 0.75;
+}
+
+/* Handy: schwebende Karte wie die Musikleiste */
+.layout-mobile .werkstattFortsetzen {
+    margin: 0 var(--wsSheetGap, 0.75em) max(env(safe-area-inset-bottom), var(--wsSheetGap, 0.75em));
+    overflow: hidden;
+    background: var(--wsMenuBg, var(--drawerColor, #202020));
+    border: var(--wsMenuBorder, 0);
+    border-radius: var(--wsMenuRadius, var(--largeRadius, 1em));
+    box-shadow: var(--wsMenuShadow, 0 0.5em 2em hsla(0, 0%, 0%, 0.45));
+    backdrop-filter: var(--blurLargest, blur(20px));
+    -webkit-backdrop-filter: var(--blurLargest, blur(20px));
+}
+
+.layout-mobile .werkstattFortsetzen-frei {
+    padding-bottom: 0.25em;
+}
+
+.layout-mobile .werkstattFortsetzen-bild {
+    width: 3em;
+    height: 3em;
+}
+
+.layout-mobile .werkstattFortsetzen > .werkstattFortsetzen-weiter {
+    font-size: 1.5em;
+}
+
+/* Desktop: Zeitleiste oben über die ganze Breite wie in Jellyfins Musikleiste
+   (.nowPlayingBarPositionContainer liegt mit der Mitte auf der Oberkante), mit denselben Werten wie
+   unsere Regler: Balken --wsTrackHeight, Füllung und Kreis in der Akzentfarbe, um die halbe
+   Kreisbreite eingerückt. Nur zur Anzeige. Wunsch: „In der Desktop-Ansicht soll die Zeitleiste
+   wieder oben drüber und so aussehen wie beim normalen Miniplayer.“ */
+:root:not(.layout-mobile) .werkstattFortsetzen-fortschritt {
+    top: calc(var(--wsTrackHeight, 0.4em) / -2 - var(--wsBarTrackLift, 0.35em));
+    right: calc(var(--wsThumbSize, 0.95em) / 2);
+    bottom: auto;
+    left: calc(var(--wsThumbSize, 0.95em) / 2);
+    z-index: 1;
+    overflow: visible;
+}
+
+:root:not(.layout-mobile) .werkstattFortsetzen-fortschritt > span {
+    position: relative;
+}
+
+:root:not(.layout-mobile) .werkstattFortsetzen-fortschritt > span::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: calc(var(--wsThumbSize, 0.95em) / -2);
+    width: var(--wsThumbSize, 0.95em);
+    height: var(--wsThumbSize, 0.95em);
+    border-radius: 50%;
+    background: var(--wsThumbColor, var(--accentColor, #f97316));
+    box-shadow: var(--wsThumbShadow, 0 0.05em 0.3em hsla(0, 0%, 0%, 0.4));
+    transform: translateY(-50%);
+}
+
+/* Handy: Balken unten wie im Miniplayer (Schalter „mini-fortschritt“), mit denselben Maßen wie dessen
+   Leiste: Mindesthöhe 3.8em ohne Innenabstand (Jellyfins .nowPlayingBarTop rechnet so), innen
+   0.25em oben und 0.6em unten, Cover 3em mit 0.25em Rand ringsum (ElegantFin: .nowPlayingBar
+   .nowPlayingImage), Titel 0.5em daneben. So stehen Cover, Titel und Balken an denselben Stellen. */
+.layout-mobile .werkstattFortsetzen {
+    box-sizing: content-box;
+    min-height: 3.8em;
+    padding: 0.25em 0.4em 0.6em;
+}
+
+.layout-mobile .werkstattFortsetzen-bild {
+    margin: 0.25em;
+}
+
+/* grosse-ansicht: Desktop: Vollbild für Musik (große Ansicht) */
+/* Große Ansicht für Musik am Desktop, „Vollbild“ (Skript des Schalters „grosse-ansicht“).
+   Eigene Ebene im body über allem außer Jellyfins Dialogen (ab z-index 999998) und Meldungen.
+   Farben aus den gemeinsamen Bausteinen: weiße Fläche mit schwarzem Symbol beim Überfahren, aktive
+   Schalter in Akzentfarbe, Regler wie überall (--ws…). Der Hintergrund ist das Cover, stark
+   weichgezeichnet und abgedunkelt, darüber ein Schleier in der Grundfarbe.
+   Alle Regeln hängen an eigenen Klassen (werkstattGross…), gleichnamige Jellyfin-Klassen tragen nur die
+   Regler (sliderContainer, mdl-slider…) und die Knöpfe (paper-icon-button-light, material-icons). */
+:root {
+    --werkstatt-grosse-ansicht: 1;
+}
+
+/* ---------- Knöpfe zum Öffnen: nur am Desktop */
+.werkstattBtnGrosseAnsicht {
+    display: none;
+}
+
+/* Musikleiste: ganz rechts außen hinter .nowPlayingBarRight (das hat rechts 0.5em Rand) */
+.layout-desktop .nowPlayingBar .nowPlayingBarTop > .werkstattBtnGrosseAnsicht {
+    display: inline-flex;
+    position: relative;
+    z-index: 2;
+    flex: 0 0 auto;
+    margin: 0 0.5em 0 -0.3em;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattBtnGrosseAnsicht {
+    display: inline-flex;
+    position: absolute;
+    top: 0.5em;
+    /* links neben dem Schließen-Pfeil (gleiche Größe: 0.5em Rand plus dessen Breite) */
+    right: 2.95em;
+    z-index: 3;
+    margin: 0;
+    font-size: 1.2em;
+    border-radius: 50%;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer:not(:has(> .werkstattSchliessen)) > .werkstattBtnGrosseAnsicht {
+    right: 0.42em;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer:has(> .werkstattBtnGrosseAnsicht:not([hidden])) .nowPlayingInfoControls .infoContainer {
+    padding-right: 2.5em;
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer:has(> .werkstattSchliessen):has(> .werkstattBtnGrosseAnsicht:not([hidden])) .nowPlayingInfoControls .infoContainer {
+    padding-right: 5.4em;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattBtnGrosseAnsicht:hover {
+        background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+        color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+        transform: none !important;
+    }
+}
+
+.layout-desktop #nowPlayingPage .nowPlayingInfoContainer > .werkstattBtnGrosseAnsicht:active {
+    background-color: var(--wsIconHoverBg, var(--fullContrastColor, #fff)) !important;
+    color: var(--wsIconHoverColor, var(--zeroContrastColor, #000)) !important;
+    transform: none !important;
+}
+
+.werkstattBtnGrosseAnsicht[hidden] {
+    display: none !important;
+}
+
+/* ---------- Ebene */
+.werkstattGross {
+    position: fixed;
+    inset: 0;
+    z-index: 99990;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    isolation: isolate;
+    color: #fff;
+    background: var(--darkerGradientPoint, #0f0f0f);
+    font-family: inherit;
+    outline: none;
+    opacity: 0;
+    transform: translateY(2.5%);
+    transition: opacity 0.25s ease, transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.werkstattGross[hidden] {
+    display: none !important;
+}
+
+.werkstattGross.werkstattGross-sichtbar {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .werkstattGross {
+        transform: none;
+        transition: opacity 0.15s linear;
+    }
+}
+
+/* Hintergrund: kleines Cover, stark weich und dunkel; der Schleier nimmt die Grundfarbe auf */
+.werkstattGross > .werkstattGross-hintergrund {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background: var(--darkerGradientPoint, #0f0f0f);
+    pointer-events: none;
+}
+
+.werkstattGross .werkstattGross-hintergrundBild {
+    position: absolute;
+    inset: -12%;
+    background: center / cover no-repeat;
+    filter: blur(80px) saturate(1.35) brightness(0.62);
+    transform: scale(1.08);
+    transition: background-image 0.8s ease;
+}
+
+.werkstattGross > .werkstattGross-hintergrund::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: hsla(0, 0%, 0%, 0.3);
+    background:
+        linear-gradient(180deg, hsla(0, 0%, 0%, 0.2), transparent 30%, transparent 62%, hsla(0, 0%, 0%, 0.5)),
+        color-mix(in srgb, var(--darkerGradientPoint, #0f0f0f) 42%, transparent);
+}
+
+/* ---------- Kopf: nur der Pfeil zum Schließen */
+.werkstattGross > .werkstattGross-kopf {
+    display: flex;
+    justify-content: flex-end;
+    padding: max(0.9em, env(safe-area-inset-top)) 1.4em 0.4em;
+}
+
+/* Symbolknöpfe: wie im Player rund, beim Überfahren weiß mit schwarzem Symbol */
+.werkstattGross .werkstattGross-knopf {
+    margin: 0;
+    border-radius: 50%;
+    color: inherit;
+}
+
+.werkstattGross .werkstattGross-knopf[hidden] {
+    display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .werkstattGross .werkstattGross-knopf:hover:not(:disabled) {
+        background-color: var(--wsIconHoverBg, #fff) !important;
+        color: var(--wsIconHoverColor, #000) !important;
+        transform: none !important;
+    }
+}
+
+.werkstattGross .werkstattGross-knopf:active:not(:disabled) {
+    background-color: var(--wsIconHoverBg, #fff) !important;
+    color: var(--wsIconHoverColor, #000) !important;
+    transform: none !important;
+}
+
+.werkstattGross .werkstattGross-knopf:focus-visible {
+    box-shadow: var(--wsFocusRing, 0 0 0 0.12em #0f0f0f, 0 0 0 0.26em #fff);
+}
+
+.werkstattGross .werkstattGross-zu {
+    font-size: 1.15em;
+}
+
+/* ---------- Mitte: Cover und Songtext nebeneinander, zusammen mittig; ohne Songtext das Cover allein in der Mitte.
+   Maße als Anteile des Fensters, abgenommen an den beiden Vorbildern des Nutzers (Apple Music, 23.10.2026):
+     2000 × 770:  Cover ≈ 500 px (65 % der Höhe), Schrift ≈ 24 px (3,1 % der Höhe), Spalte ≈ 600 px
+     1680 × 1300: Cover ≈ 695 px (41 % der Breite), Schrift ≈ 38 px (2,3 % der Breite), Spalte ≈ 615 px
+   Daraus: Cover min(65vh, 41vw), Schrift min(3.1vh, 2.3vw), Spalte min(36vw, 42rem), alles mit Unter- und
+   Obergrenzen. Die Spalte ist damit gut so breit wie das Cover, die Zeilen brechen wie im Vorbild nur im
+   hohen Fenster um (Wunsch: „Warum ist die Aufteilung von der Breite her mit Bild und Lyrics nicht so wie auf
+   dem Referenzbild“). Vorher hingen die Maße an Container-Einheiten der Mitte, die Spalte geriet dabei viel
+   schmaler als das Cover. Der Rand unten hält die Leiste auf Abstand, das Cover berührt sie nie. */
+.werkstattGross > .werkstattGross-mitte {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    margin: 0 clamp(1rem, 4vw, 5rem) clamp(1.75rem, 5vh, 3.5rem);
+}
+
+.werkstattGross .werkstattGross-coverplatz {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+}
+
+/* Cover als Hintergrundbild eines quadratischen Kastens ohne Kinder: nichts kann es zusammenschieben */
+.werkstattGross .werkstattGross-cover {
+    display: block;
+    box-sizing: border-box;
+    width: clamp(12rem, min(65vh, 41vw), 52rem);
+    max-height: calc(100vh - 12rem);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--largeRadius, 1em);
+    background: hsla(0, 0%, 100%, 0.07) center / cover no-repeat;
+    box-shadow: 0 1.5em 4em hsla(0, 0%, 0%, 0.5);
+}
+
+/* Songtext-Spalte: beim Ausblenden schrumpft sie auf null, das Cover wandert dabei weich in die Mitte */
+.werkstattGross .werkstattGross-textplatz {
+    position: relative;
+    flex: 0 1 auto;
+    align-self: stretch;
+    width: clamp(16rem, 36vw, 42rem);
+    min-width: 0;
+    margin-left: clamp(1.5rem, 4vw, 6rem);
+    overflow: hidden;
+    opacity: 1;
+    visibility: visible;
+    transition: width 0.45s ease, margin-left 0.45s ease, opacity 0.3s ease 0.1s, visibility 0s linear 0s;
+}
+
+.werkstattGross.werkstattGross-ohneText .werkstattGross-textplatz {
+    width: 0;
+    margin-left: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: width 0.45s ease, margin-left 0.45s ease, opacity 0.2s ease, visibility 0s linear 0.45s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .werkstattGross .werkstattGross-textplatz,
+    .werkstattGross.werkstattGross-ohneText .werkstattGross-textplatz {
+        transition: none;
+    }
+}
+
+/* Sehr schmal: dann bleibt neben dem Songtext kein Platz fürs große Cover (es steht ja unten in der Leiste) */
+@media (max-width: 40em) {
+    .werkstattGross:not(.werkstattGross-ohneText) .werkstattGross-coverplatz {
+        display: none;
+    }
+
+    .werkstattGross .werkstattGross-textplatz {
+        flex: 1 1 auto;
+        margin-left: 0;
+    }
+}
+
+/* ---------- Songtext: groß, fett, linksbündig; aktuelle Zeile hell, übrige gedimmt */
+.werkstattGross .werkstattGross-scroll {
+    position: absolute;
+    inset: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 82%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 82%, transparent 100%);
+}
+
+.werkstattGross .werkstattGross-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.werkstattGross .werkstattGross-songtext {
+    /* Wie im Vorbild beginnt der Text oben; unten Platz, damit auch die letzte Zeile hochscrollen kann */
+    padding: 6vh 0 55vh;
+    /* flaches Fenster kleiner, hohes größer (siehe oben) */
+    font-size: clamp(1.15rem, min(3.1vh, 2.3vw), 2.6rem);
+    font-weight: 700;
+    line-height: 1.22;
+    letter-spacing: -0.01em;
+}
+
+.werkstattGross .werkstattGross-songtext.werkstattGross-songtext-frei {
+    padding-top: 2em;
+    padding-bottom: 4em;
+}
+
+/* Ohne Kasten: früher hatte jede Zeile eine Hover-Fläche mit Innenabstand und gleich großer negativer
+   Einrückung; mit der Maus darüber stand die Zeile versetzt in einer grauen Fläche (Wunsch: „Warum ist die
+   Schrift so komisch versetzt“). Jetzt beginnen alle Zeilen an derselben Kante, Hover hellt nur auf. */
+.werkstattGross .werkstattGross-zeile {
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 0.5em;
+    padding: 0;
+    overflow-wrap: break-word;
+    opacity: 0.34;
+    transition: opacity 0.35s ease;
+}
+
+.werkstattGross .werkstattGross-zeile[data-start] {
+    cursor: pointer;
+}
+
+.werkstattGross .werkstattGross-zeile.werkstattGross-jetzt {
+    opacity: 1;
+}
+
+.werkstattGross .werkstattGross-songtext-frei .werkstattGross-zeile {
+    opacity: 0.88;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .werkstattGross .werkstattGross-zeile[data-start]:not(.werkstattGross-jetzt):hover {
+        opacity: 0.7;
+    }
+}
+
+/* Drei Punkte vor dem ersten Einsatz und in Pausen: pulsieren in Akzentfarbe, solange sie dran sind */
+.werkstattGross .werkstattGross-punkte {
+    display: flex;
+    align-items: center;
+    gap: 0.32em;
+    height: 1.22em;
+}
+
+.werkstattGross .werkstattGross-punkte > span {
+    width: 0.3em;
+    height: 0.3em;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.werkstattGross .werkstattGross-punkte.werkstattGross-jetzt {
+    color: var(--accentColor, #f97316);
+}
+
+.werkstattGross .werkstattGross-punkte.werkstattGross-jetzt > span {
+    animation: werkstattGrossPunkt 1.4s ease-in-out infinite;
+}
+
+.werkstattGross .werkstattGross-punkte.werkstattGross-jetzt > span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.werkstattGross .werkstattGross-punkte.werkstattGross-jetzt > span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes werkstattGrossPunkt {
+    0%, 100% { transform: scale(0.7); opacity: 0.55; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .werkstattGross .werkstattGross-punkte.werkstattGross-jetzt > span {
+        animation: none;
+    }
+}
+
+/* ---------- Fuß im Aufbau unserer Musikleiste (Desktop): Zeitleiste oben über die ganze Breite,
+   links Cover, Titel, Künstler; Mitte Wiederholen, Zurück, Play/Pause, Weiter, Zufall;
+   rechts Lautstärke, Wiedergabeliste, Songtext, Herz, ⋮ und die Zeit. Höhe wie Jellyfins Leiste (4.2em),
+   über die volle Breite am unteren Rand wie die Musikleiste. */
+.werkstattGross > .werkstattGross-fuss {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1em;
+    min-height: 4.2em;
+    padding: 0 0.5em max(0px, env(safe-area-inset-bottom)) 0;
+    background: hsla(0, 0%, 0%, 0.25);
+}
+
+/* Zeitleiste auf der Oberkante, wie in der Musikleiste um --wsBarTrackLift angehoben (Wunsch: „Mit der
+   Wiedergabeleiste war wirklich nur der Balken gemeint. Der soll da bitte allgemein höher“), damit der Kreis
+   das kleine Cover nicht berührt. Der Rand unter der Mitte (mindestens 1.75rem) ist größer als das, was
+   Balken und gedrückter Kreis über die Leiste hinausragen (etwa 1em), das große Cover bleibt frei. */
+.werkstattGross .werkstattGross-zeitleiste {
+    position: absolute;
+    top: calc(-0.8em - var(--wsBarTrackLift, 0.35em));
+    right: 0;
+    left: 0;
+    z-index: 1;
+    height: 1.6em;
+}
+
+.werkstattGross .werkstattGross-info {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.werkstattGross .werkstattGross-miniCover {
+    flex: 0 0 auto;
+    width: 3.5em;
+    height: 3.5em;
+    margin: 0.35em 0.5em 0.35em 0.35em;
+    border-radius: var(--smallerRadius, 0.375em);
+    background: hsla(0, 0%, 100%, 0.08) center / cover no-repeat;
+}
+
+.werkstattGross .werkstattGross-texte {
+    min-width: 0;
+    font-size: 92%;
+    line-height: 1.4;
+}
+
+.werkstattGross .werkstattGross-titel,
+.werkstattGross .werkstattGross-kuenstler {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.werkstattGross .werkstattGross-kuenstler {
+    color: hsla(0, 0%, 100%, 0.6);
+}
+
+.werkstattGross .werkstattGross-steuerung {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2em;
+}
+
+/* Play/Pause wie in der Musikleiste: ohne Fläche, Symbol größer, Markierung nur wenig größer */
+.werkstattGross .werkstattGross-play {
+    font-size: 1.75em;
+    padding: 0.32em;
+}
+
+.werkstattGross .werkstattGross-rechts {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.1em;
+    min-width: 0;
+}
+
+/* Songtext-Knopf ohne Songtext: ausgegraut */
+.werkstattGross .werkstattGross-knopf:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.werkstattGross .werkstattGross-lautstaerke {
+    flex: 0 1 7em;
+    width: 7em;
+    height: 1.6em;
+    margin: 0 0.4em;
+}
+
+.werkstattGross .werkstattGross-zeit {
+    flex: 0 0 auto;
+    padding: 0 0.6em 0 0.75em;
+    color: hsla(0, 0%, 100%, 0.78);
+    font-size: 92%;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---------- Schmaler: rechts in der Leiste wird es eng (die Mitte bleibt mittig): erst der Lautstärke-Regler,
+   dann die Zeit weg. Gerechnet mit 2.4em je Knopf, Regler 7em, Zeit etwa 6.5em. */
+@media (max-width: 75em) {
+    .werkstattGross .werkstattGross-lautstaerke {
+        display: none;
+    }
+}
+
+@media (max-width: 56em) {
+    .werkstattGross .werkstattGross-zeit {
+        display: none;
+    }
+}
+
+/* Ganz schmal: links nur das kleine Cover, die Steuerung rückt daneben */
+@media (max-width: 44em) {
+    .werkstattGross > .werkstattGross-fuss {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 0.5em;
+    }
+
+    .werkstattGross .werkstattGross-texte {
+        display: none;
+    }
+}
+
+/* bibliothek-reiter: Bibliotheken: weniger Reiter, eigene Reihenfolge */
+/* Reiter der Bibliotheken (Skript des Schalters „bibliothek-reiter“). Das Skript blendet mit Jellyfins
+   eigener Klasse .hide aus (die überspringt auch das Wischen) und stellt die Knöpfe im DOM um.
+   Diese Variable schaltet das Skript ein, ohne sie nimmt es alles zurück. */
+:root {
+    --werkstatt-reiter: 1;
+}
+
+/* Zur Sicherheit, falls ein anderes CSS .hide überstimmt */
+.headerTabs .emby-tab-button[data-werkstatt-reiter-weg] {
+    display: none !important;
+}
+
+/* folgen-ueberschriften: Serien, Reiter „Folgen“: Überschriften je Serie und Staffel */
+/* Überschriften im Reiter „Folgen“ (Skript des Schalters „folgen-ueberschriften“). Das Skript setzt
+   div.werkstattFolgenKopf als Geschwister zwischen die Karten bzw. Listenzeilen: darin h2.sectionTitle mit
+   dem Seriennamen (nur beim Wechsel der Serie) und h3 mit „Staffel N“. Diese Variable schaltet das Skript
+   ein, ohne sie nimmt es die Überschriften wieder heraus. */
+:root {
+    --werkstatt-folgen-ueberschriften: 1;
+}
+
+/* ElegantFin zentriert das Folgenraster (#episodesTab > .vertical-wrap). Mit Überschriften beginnen die
+   Reihen links, sonst stünde eine kurze Staffel mittig unter einer linksbündigen Überschrift. */
+#tvRecommendedPage #episodesTab > .itemsContainer.vertical-wrap:has(> .werkstattFolgenKopf) {
+    justify-content: flex-start !important;
+}
+
+/* Über die ganze Breite, im Raster (Flex mit row-gap 1em, Kartenrand --padding 0.375em) wie in der
+   Liste (Flex-Spalte, am Desktop mit großen Bildern als Grid) */
+#tvRecommendedPage #episodesTab .itemsContainer > .werkstattFolgenKopf {
+    flex: 0 0 100%;
+    grid-column: 1 / -1;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0.8em 0 0;
+    padding: 0 0.375em;
+    text-align: left;
+}
+
+#tvRecommendedPage #episodesTab .itemsContainer > .werkstattFolgenKopf:first-child {
+    margin-top: 0;
+}
+
+/* Nur Staffelwechsel: näher an der vorigen Staffel */
+#tvRecommendedPage #episodesTab .itemsContainer > .werkstattFolgenKopf:not(.werkstattFolgenKopf-mitSerie) {
+    margin-top: 0.4em;
+}
+
+/* Die Liste hat keinen Zeilenabstand: Abstand zur ersten Zeile selbst */
+#tvRecommendedPage #episodesTab .itemsContainer.vertical-list > .werkstattFolgenKopf {
+    margin-bottom: 0.6em;
+    padding: 0;
+}
+
+#tvRecommendedPage #episodesTab .itemsContainer.vertical-list > .werkstattFolgenKopf:not(:first-child) {
+    margin-top: 1.4em;
+}
+
+.layout-mobile #tvRecommendedPage #episodesTab .itemsContainer > .werkstattFolgenKopf {
+    padding: 0 0.1em;
+}
+
+/* Serienname wie eine Abschnittsüberschrift (.sectionTitle, ElegantFin 1.5rem bzw. 1.35rem am Handy) */
+.werkstattFolgenKopf > .werkstattFolgenKopf-serie {
+    margin: 0 0 0.35em;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.werkstattFolgenKopf > .werkstattFolgenKopf-staffel {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.werkstattFolgenKopf-zusatz {
+    margin-left: 0.6em;
+    font-weight: 400;
+    color: var(--dimTextColor, hsla(0, 0%, 100%, 0.6));
+}
