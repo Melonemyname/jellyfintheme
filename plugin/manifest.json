@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "3287719a-c59e-4b46-8f7a-8ba59429ee74",
+    "name": "Deezer & Apple Bilder",
+    "description": "Zusätzliche Bildquellen für Musik: Interpretenfotos von Deezer sowie Albumcover von Deezer und Apple (iTunes). Die Bilder erscheinen unter „Bilder bearbeiten“ in der Bildsuche und lassen sich in den Bibliothekseinstellungen auch als automatische Bildquelle einschalten. Kein API-Schlüssel nötig.",
+    "overview": "Interpretenfotos und Albumcover von Deezer und Apple",
+    "owner": "Melonemyname",
+    "category": "Metadata",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Erste Fassung: Interpretenfotos von Deezer, Albumcover von Deezer und Apple.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/Melonemyname/jellyfintheme/main/plugin/dist/jellyfin-plugin-bilder_1.0.0.0.zip",
+        "checksum": "ec1c352a26bc27d6659404c2b5244baf",
+        "timestamp": "2026-10-23T11:20:26Z"
+      }
+    ]
+  }
+]

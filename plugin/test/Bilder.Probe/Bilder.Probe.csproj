@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Prüfprogramm: führt Suche und Abgleich ohne Jellyfin gegen die echten APIs aus. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Jellyfin.Plugin.Bilder/Jellyfin.Plugin.Bilder.csproj" />
+    <!-- Hier mit Laufzeit-DLLs, damit die Anbieter samt Jellyfin-Typen ausprobiert werden können -->
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
