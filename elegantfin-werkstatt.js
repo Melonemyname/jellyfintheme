@@ -5131,9 +5131,10 @@
 
             // Je Seite: Zahl der Reiter bei Jellyfin und gewünschte Reihenfolge (data-index); was fehlt, wird ausgeblendet
             var ARTEN = {
-                // Interpreten, Alben, Lieder, Wiedergabelisten, Genres (weg: Vorschläge, Album-Interpreten);
-                // Wiedergabelisten seit dem 23.10.2026 wieder da („mach mal bitte Wiedergabelisten wieder rein“)
-                musicRecommendedPage: { anzahl: 7, folge: [3, 0, 5, 4, 6] },
+                // Album-Interpreten, Interpreten, Alben, Lieder, Wiedergabelisten, Genres (weg: Vorschläge).
+                // Nachträge vom 23.10.2026: „mach mal bitte Wiedergabelisten wieder rein“ und Album-Interpreten
+                // wieder da, vorn (seit die Gäste eigene Interpreten sind, listet „Interpreten“ jeden Gast)
+                musicRecommendedPage: { anzahl: 7, folge: [2, 3, 0, 5, 4, 6] },
                 // Filme, Sammlungen, Genres, Favoriten (weg: Vorschläge)
                 moviesPage: { anzahl: 5, folge: [0, 3, 4, 2] },
                 // Serien, Folgen, Genres (weg: Vorschläge, Demnächst, Fernsehsender)
