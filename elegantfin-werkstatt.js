@@ -5835,14 +5835,12 @@
             var MEIN = 'data-werkstatt-ansicht';        // eigene Elemente (Knopf, Leiste, Karten, Zeilen, Menü)
             var ART_ATTR = 'data-werkstatt-ansichtsart'; // am Behälter: welche eigene Ansicht gerade steht
             var BILD = 'data-werkstatt-bild';            // Bild, das erst beim Näherkommen geladen wird
-            var NAMEN = { List: 'Liste', Poster: 'Poster', PosterCard: 'Posterkarte', Thumb: 'Miniaturansicht', ThumbCard: 'Miniaturansichtkarte' };
-            var PARALLEL = 6;               // gleichzeitige Abfragen der Genre-Cover
-            var NOCHMAL = 60 * 1000;        // fehlgeschlagene Abfrage frühestens nach einer Minute wiederholen
+            var NAMEN = { List: 'Liste', Poster: 'Poster', PosterCard: 'Posterkarte' };
 
             // nativ: die Ansicht, die Jellyfin selbst zeichnet (dann bleiben seine Einträge stehen)
             var ARTEN = [
                 { name: 'lieder', index: '5', endung: '-songs-_view', ansichten: ['List', 'Poster', 'PosterCard'], start: 'List', nativ: 'List' },
-                { name: 'genres', index: '6', endung: '-genres-werkstatt-_view', ansichten: ['List', 'Poster', 'PosterCard', 'Thumb', 'ThumbCard'], start: 'Poster', nativ: null }
+                { name: 'genres', index: '6', endung: '-genres-werkstatt-_view', ansichten: ['List', 'Poster', 'PosterCard'], start: 'Poster', nativ: null }
             ];
 
             var live = null;        // Jellyfins Anzeige-Einstellungen im Speicher (userSettings.displayPrefs)
@@ -5850,10 +5848,8 @@
             var serverKopie = null; // CustomPrefs vom Server, einmal geholt (bis „live“ bekannt ist)
             var serverHolt = false;
             var geschrieben = {};   // in dieser Sitzung gewählte Ansichten: Schlüssel -> Wert
-            var genreDaten = {};    // Genre-Id -> { cover: [{ id, tag }], alben } | { laedt } | { fehlt: Zeit }
             var zaehler = {};       // Genre-Id -> { alben, lieder }
             var zaehlerGeholt = {}; // Bibliothek -> true
-            var schlange = [], laufend = 0;
             var io = null, mo = null, wartet = 0;
 
             function warn(was, e) {
@@ -6215,61 +6211,7 @@
                 };
             }
 
-            // ---------- Genre-Cover und Zähler (window.ApiClient)
-
-            function abfrage() {
-                while (laufend < PARALLEL && schlange.length) {
-                    laufend++;
-                    (schlange.shift())(function () {
-                        laufend--;
-                        abfrage();
-                    });
-                }
-            }
-
-            function coverHolen(a, u, pid, g) {
-                genreDaten[g.id] = { laedt: true };
-                schlange.push(function (fertig) {
-                    var erledigt = false;
-                    var ende = function (res) {
-                        if (erledigt) return;
-                        erledigt = true;
-                        if (res) {
-                            var gesehen = {}, cover = [];
-                            (res.Items || []).forEach(function (it) {
-                                var tag = it && it.ImageTags && it.ImageTags.Primary;
-                                if (!tag || gesehen[tag] || cover.length >= 4) return;
-                                gesehen[tag] = true;
-                                cover.push({ id: it.Id, tag: tag });
-                            });
-                            genreDaten[g.id] = { cover: cover, alben: res.TotalRecordCount };
-                        } else {
-                            genreDaten[g.id] = { fehlt: Date.now() };
-                        }
-                        veraltet();
-                        fertig();
-                    };
-                    setTimeout(function () { ende(null); }, 10000);
-                    try {
-                        var q = {
-                            IncludeItemTypes: 'MusicAlbum',
-                            Recursive: true,
-                            GenreIds: g.id,
-                            SortBy: 'ProductionYear,PremiereDate,SortName',
-                            SortOrder: 'Descending',
-                            Limit: 12,
-                            ImageTypeLimit: 1,
-                            EnableImageTypes: 'Primary',
-                            EnableUserData: false,
-                            EnableTotalRecordCount: true
-                        };
-                        if (pid) q.ParentId = pid;
-                        Promise.resolve(a.getItems(u, q)).then(function (res) { ende(res || { Items: [] }); }, function () { ende(null); });
-                    } catch (e) {
-                        ende(null);
-                    }
-                });
-            }
+            // ---------- Genre-Zähler (window.ApiClient)
 
             function zaehlerHolen(a, u, pid) {
                 if (zaehlerGeholt[pid] || typeof a.getGenres !== 'function') return;
@@ -6293,13 +6235,6 @@
                 if (!a || !u || typeof a.getItems !== 'function') return;
                 var pid = bibliothek(seite);
                 zaehlerHolen(a, u, pid);
-                var jetzt = Date.now();
-                daten.forEach(function (g) {
-                    if (!g.id) return;
-                    var e = genreDaten[g.id];
-                    if (!e || (e.fehlt && jetzt - e.fehlt > NOCHMAL)) coverHolen(a, u, pid, g);
-                });
-                abfrage();
             }
 
             // Neue Daten: Genre-Behälter neu zeichnen lassen
@@ -6310,19 +6245,9 @@
                 planen();
             }
 
-            function bildUrl(c, px) {
-                var a = api();
-                if (!a || typeof a.getScaledImageUrl !== 'function') return '';
-                try {
-                    return a.getScaledImageUrl(c.id, { type: 'Primary', tag: c.tag, fillWidth: px, fillHeight: px, quality: 90 }) || '';
-                } catch (e) {
-                    return '';
-                }
-            }
-
             function zahlenText(g) {
-                var z = zaehler[g.id] || {}, d = genreDaten[g.id] || {};
-                var alben = z.alben != null ? z.alben : d.alben;
+                var z = zaehler[g.id] || {};
+                var alben = z.alben;
                 var teile = [];
                 if (alben) teile.push(alben + (alben === 1 ? ' Album' : ' Alben'));
                 if (z.lieder) teile.push(z.lieder + (z.lieder === 1 ? ' Lied' : ' Lieder'));
@@ -6394,43 +6319,17 @@
                 });
             }
 
-            // Fläche einer Genre-Karte: Raster, einzelnes Cover, Band (Miniaturansicht) oder Ersatz mit Namen
-            function genreBild(g, form) {
-                var e = genreDaten[g.id];
-                var cover = (e && e.cover) || [];
-                var urls = function (n, px) { return cover.slice(0, n).map(function (c) { return bildUrl(c, px); }).filter(Boolean); };
-                if (form === 'backdrop') {
-                    var reihe = urls(3, 280);
-                    if (reihe.length) {
-                        return {
-                            klasse: 'cardImageContainer werkstattGenreBild werkstattGenreBild-band',
-                            inhalt: '<div class="werkstattGenreBild-grund"' + bildAttr(reihe[0]) + '></div><div class="werkstattGenreBild-reihe">' +
-                                reihe.map(function (u) { return '<div class="werkstattGenreBild-teil"' + bildAttr(u) + '></div>'; }).join('') + '</div>'
-                        };
-                    }
-                } else if (cover.length >= 4) {
-                    var vier = urls(4, 200);
-                    if (vier.length === 4) {
-                        return {
-                            klasse: 'cardImageContainer werkstattGenreBild werkstattGenreBild-raster',
-                            inhalt: vier.map(function (u) { return '<div class="werkstattGenreBild-teil"' + bildAttr(u) + '></div>'; }).join('')
-                        };
-                    }
-                } else if (cover.length) {
-                    var eins = urls(1, 400);
-                    if (eins.length) return { klasse: 'cardImageContainer coveredImage', url: eins[0], inhalt: '' };
-                }
-                // Lädt noch: leere Fläche (sonst stünde kurz der Name da); sonst wie Jellyfin ohne Bild der Name
-                var laedt = !!(api() && g.id && (!e || e.laedt));
+            // Fläche einer Genre-Karte: wie ein Album ohne Bild, der Name auf der farbigen Ersatzfläche
+            function genreBild(g) {
                 return {
-                    klasse: 'cardImageContainer ' + ersatzKlasse(g.name) + (laedt ? ' werkstattGenreBild-laedt' : ''),
-                    inhalt: laedt ? '' : '<div class="cardText cardDefaultText">' + esc(g.name) + '</div>'
+                    klasse: 'cardImageContainer ' + ersatzKlasse(g.name),
+                    inhalt: '<div class="cardText cardDefaultText">' + esc(g.name) + '</div>'
                 };
             }
 
             function genreKarteHtml(g, i, v) {
-                var l = layout(), form = v.indexOf('Thumb') === 0 ? 'backdrop' : 'square', karte = /Card$/.test(v);
-                var b = genreBild(g, form);
+                var l = layout(), form = 'square', karte = /Card$/.test(v);
+                var b = genreBild(g);
                 var overlay = l === 'desktop' ? g.overlay : (l === 'mobile' && !karte ? g.mobil : '');
                 var zeilen = [g.titelHtml];
                 if (karte) {
@@ -6440,17 +6339,13 @@
                 return karteHtml({
                     form: form, karte: karte, zentriert: !karte, musik: false, attr: g.attr, index: i, art: 'genre',
                     href: g.href, aktion: 'link', label: g.name,
-                    bildKlasse: b.klasse, bildUrl: b.url || '', bildInhalt: b.inhalt, padder: '',
+                    bildKlasse: b.klasse, bildUrl: '', bildInhalt: b.inhalt, padder: '',
                     overlay: overlay, zeilen: zeilen
                 });
             }
 
             function genreZeileHtml(g, i) {
-                var e = genreDaten[g.id], c = e && e.cover && e.cover[0];
-                var url = c ? bildUrl(c, 80) : '';
-                var bild = url ?
-                    '<div data-action="link" class="listItemImage itemAction"' + bildAttr(url) + ' item-icon></div>' :
-                    '<div class="listItemImage cardImageContainer ' + ersatzKlasse(g.name) + '"><span class="cardImageIcon material-icons queue_music" aria-hidden="true"></span></div>';
+                var bild = '<div class="listItemImage cardImageContainer ' + ersatzKlasse(g.name) + '"><span class="cardImageIcon material-icons queue_music" aria-hidden="true"></span></div>';
                 var z = zahlenText(g);
                 return '<div class="listItem listItem-border" data-action="link"' + g.attr + ' ' + MEIN + '="genre">' + bild +
                     '<div class="listItemBody itemAction"><div class="listItemBodyText"><bdi>' + esc(g.name) + '</bdi></div>' +
