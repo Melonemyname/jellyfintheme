@@ -1361,19 +1361,31 @@ html.layout-desktop > body {
     color: hsl(0, 0%, 58%);
 }
 
-/* bibliothek-ohne-abspielen-zufall: Bibliothek: ohne „Alles abspielen“ und „Zufall“ */
-/* Werkzeugleiste der Bibliothek: Alles abspielen und Zufall ausblenden, der Seitenzähler bleibt */
-.libraryPage .btnPlayAll,
-.libraryPage .btnShuffle {
+/* bibliothek-ohne-abspielen-zufall: Bibliothek: ohne „Alles abspielen“ und „Zufall“ (außer Musik) */
+/* Werkzeugleiste der Bibliothek: Alles abspielen und Zufall ausblenden, der Seitenzähler bleibt.
+   Ausgenommen: die Musikbibliothek (#musicRecommendedPage, Wunsch vom 25.10.2026, Knöpfe dort siehe
+   Schalter „musik-abspielen-zufall“) und die Detailseite (#itemDetailPage ist ebenfalls eine
+   .libraryPage, für sie gilt die Regel weiter unten). */
+.libraryPage:not(#musicRecommendedPage):not(.itemDetailPage) .btnPlayAll,
+.libraryPage:not(#musicRecommendedPage):not(.itemDetailPage) .btnShuffle {
+    display: none;
+}
+
+/* Detailseite: Zufall (itemDetails/index.js zeigt ihn bei Ordnern und bei MusicAlbum, MusicGenre,
+   MusicArtist) nur bei Musik. Musik erkennt das CSS am sichtbaren Sofortmix-Knopf (.btnInstantMix gibt
+   es nur bei Audio, MusicAlbum, MusicGenre, MusicArtist), Wiedergabelisten mit Musik am Merker
+   data-werkstatt-musik, den das Skript von „musik-abspielen-zufall“ setzt. Serien, Staffeln,
+   Sammlungen und Ordner bleiben ohne Zufall wie bisher. */
+.itemDetailPage .mainDetailButtons:not(:has(> .btnInstantMix:not(.hide))):not([data-werkstatt-musik]) > .btnShuffle {
     display: none;
 }
 
 /* Ordnerseite (list.html: Heimvideos wie „Konzerte“, Ordner, Listen hinter „Mehr“): „Alles abspielen“
    heißt dort .btnPlay, als Textknopf (ab 40em) und als Symbolknopf (darunter). Nur in deren Leiste
-   (.itemsViewSettingsContainer), denn .btnPlay heißt auch der grüne Knopf der Detailseite, und die
-   ist ebenfalls eine .libraryPage. Zufall ist oben schon erfasst, „Zur Warteschlange“ (.btnQueue,
-   nur während einer Wiedergabe) bleibt. */
-.libraryPage .itemsViewSettingsContainer > .btnPlay {
+   (.itemsViewSettingsContainer), denn .btnPlay heißt auch der grüne Knopf der Detailseite. Zufall ist
+   oben schon erfasst, „Zur Warteschlange“ (.btnQueue, nur während einer Wiedergabe) bleibt. Die
+   Musikbibliothek ist ausgenommen, falls dort eine solche Leiste steht. */
+.libraryPage:not(#musicRecommendedPage) .itemsViewSettingsContainer > .btnPlay {
     display: none;
 }
 
@@ -3896,4 +3908,145 @@ body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortset
     margin-left: 0.6em;
     font-weight: 400;
     color: var(--dimTextColor, hsla(0, 0%, 100%, 0.6));
+}
+
+/* musik-reiter-breite: Musik, Reiter „Lieder“ volle Breite, „Genres“ linksbündig */
+/* Reiter „Lieder“: Jellyfin setzt am Behälter style="max-width:67.5em;margin: 0 auto;" (music.html).
+   !important schlägt das Inline-Style. Seitenabstand wie .padded-left/.padded-right der anderen Reiter. */
+#musicRecommendedPage #songsTab > .itemsContainer {
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+}
+
+.layout-desktop #musicRecommendedPage #songsTab > .itemsContainer,
+.layout-tv #musicRecommendedPage #songsTab > .itemsContainer {
+    padding-left: max(env(safe-area-inset-left), var(--sidePadding, 3.3%));
+    padding-right: max(env(safe-area-inset-right), var(--sidePadding, 3.3%));
+}
+
+/* Reiter „Genres“: ElegantFin zentriert (#genresTab > .vertical-wrap { justify-content: center !important }),
+   die letzte Reihe stand dann eingerückt. Links beginnen wie bei Alben. */
+#musicRecommendedPage #genresTab > .itemsContainer.vertical-wrap {
+    justify-content: flex-start !important;
+}
+
+/* musik-reiter-ansicht: Musik, Reiter „Lieder“ und „Genres“: Ansicht wählbar, saubere Genre-Bilder */
+/* Ansicht der Reiter „Lieder“ und „Genres“ (Skript des Schalters „musik-reiter-ansicht“). Das Skript setzt
+   eigene Karten bzw. Zeilen (data-werkstatt-ansicht) in Jellyfins Behälter, am Behälter steht die Ansicht in
+   data-werkstatt-ansichtsart. Diese Variable schaltet das Skript ein, ohne sie nimmt es alles zurück. */
+:root {
+    --werkstatt-ansicht: 1;
+}
+
+/* Lieder als Karten am Handy: Seitenabstand wie die anderen Reiter (die Liste behält ElegantFins 1em je Zeile) */
+.layout-mobile #musicRecommendedPage #songsTab > .itemsContainer[data-werkstatt-ansichtsart]:not([data-werkstatt-ansichtsart="List"]) {
+    padding-left: max(env(safe-area-inset-left), var(--sidePadding, 3.3%));
+    padding-right: max(env(safe-area-inset-right), var(--sidePadding, 3.3%));
+}
+
+/* Genres in der Liste: kein Abstand oben doppelt (Leiste und Behälter haben beide padded-top) */
+#musicRecommendedPage #genresTab > .focuscontainer-x + .itemsContainer.padded-top {
+    padding-top: 0 !important;
+}
+
+/* Genre-Bild als 2×2-Raster aus vier verschiedenen Covern */
+.werkstattGenreBild {
+    overflow: hidden;
+}
+
+.cardImageContainer.werkstattGenreBild-raster {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 0;
+}
+
+.werkstattGenreBild-teil {
+    min-width: 0;
+    min-height: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Miniaturansicht: bis zu drei Cover nebeneinander vor dem unscharfen ersten */
+.cardImageContainer.werkstattGenreBild-band {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.werkstattGenreBild-grund {
+    position: absolute;
+    inset: -10%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(18px) brightness(0.55) saturate(1.2);
+}
+
+.werkstattGenreBild-reihe {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4%;
+    width: 100%;
+    height: 50%;
+}
+
+.werkstattGenreBild-reihe > .werkstattGenreBild-teil {
+    flex: 0 0 auto;
+    height: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--smallRadius, 0.3em);
+    box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.45);
+}
+
+/* Zeilen der Genres: Bild quadratisch wie Jellyfins Liste */
+#musicRecommendedPage #genresTab .listItem[data-werkstatt-ansicht] .listItemImage {
+    background-size: cover;
+    background-position: center;
+}
+
+/* musik-abspielen-zufall: Musik: Abspielen und Zufall auf allen Reitern und Unterseiten */
+/* Musik: Abspielen und Zufall auf den Reitern (Skript des Schalters „musik-abspielen-zufall“).
+   Das Skript setzt in die obere Leiste jedes Reiters von #musicRecommendedPage zwei Knöpfe:
+   button.btnPlay.detailButton.werkstattAbspielen-alle (Pille mit Schrift wie auf der Detailseite, Farbe
+   und Hover aus „einheitliche-playbuttons“) und button.btnShuffle.werkstattAbspielen-zufall (Symbol wie
+   Jellyfins eigener). Jellyfins eigene Knöpfe auf „Alben“ und „Lieder“ markiert es mit
+   data-werkstatt-abspielen-ersetzt. Diese Variable schaltet das Skript ein, ohne sie nimmt es alles zurück. */
+:root {
+    --werkstatt-abspielen: 1;
+}
+
+#musicRecommendedPage [data-werkstatt-abspielen-ersetzt] {
+    display: none !important;
+}
+
+/* Die Pille in der Leiste: ElegantFin gibt .btnPlay.detailButton Höhe 3em, Mindestbreite 10em und
+   rechts 0.5em Abstand; jf-main setzt .detailButton auf margin 0 !important. Links etwas Luft zum
+   Seitenzähler. Die Schrift steht wie auf der Detailseite rechts vom Symbol (dort per ::after aus dem
+   title, .mainDetailButtons > .btnPlay:after, padding-right 1ch). */
+#musicRecommendedPage .werkstattAbspielen-alle.btnPlay.detailButton {
+    flex: 0 0 auto;
+    margin: 0.25em 0.5em !important;
+}
+
+#musicRecommendedPage .werkstattAbspielen-alle > .werkstattAbspielen-text {
+    padding-right: 1ch;
+    white-space: nowrap;
+}
+
+/* Handy hochkant: ElegantFin zieht .btnPlay.detailButton auf die volle Breite (flex 0 0 100%), das ist
+   für die Detailseite gedacht; in der Leiste bleibt die Pille so breit wie ihr Inhalt */
+.layout-mobile #musicRecommendedPage .werkstattAbspielen-alle.btnPlay.detailButton {
+    flex: 0 0 auto;
+    margin-right: 0.5em !important;
+}
+
+/* Eigene Leiste auf Reitern ohne Leiste (Wiedergabelisten, Genres): kein doppelter Abstand zum Raster */
+#musicRecommendedPage .werkstattAbspielenLeiste + .itemsContainer.padded-top {
+    padding-top: 0;
 }

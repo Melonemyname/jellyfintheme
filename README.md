@@ -78,7 +78,7 @@ Speichern, Seite neu laden.
 - Listen: Gesehen-Status am Haken-Knopf statt auf dem Cover
 - Folgenliste: Gesehen-Haken wie auf den Karten
 - Klassischer Darkmode statt Blaugrau
-- Bibliothek: ohne „Alles abspielen“ und „Zufall“
+- Bibliothek: ohne „Alles abspielen“ und „Zufall“ (außer Musik)
 - Serien: Staffelzahl im Zähler *(Skript)*
 - Handy: „Meine Medien“ zweispaltig
 - Seitenmenü ohne harte Kante
@@ -118,6 +118,9 @@ Speichern, Seite neu laden.
 - Desktop: Vollbild für Musik (große Ansicht) *(Skript)*
 - Bibliotheken: weniger Reiter, eigene Reihenfolge *(Skript)*
 - Serien, Reiter „Folgen“: Überschriften je Serie und Staffel *(Skript)*
+- Musik, Reiter „Lieder“ volle Breite, „Genres“ linksbündig
+- Musik, Reiter „Lieder“ und „Genres“: Ansicht wählbar, saubere Genre-Bilder *(Skript)*
+- Musik: Abspielen und Zufall auf allen Reitern und Unterseiten *(Skript)*
 
 ## Lizenz und Herkunft
 

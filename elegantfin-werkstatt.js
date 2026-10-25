@@ -5818,3 +5818,1425 @@
         console.warn("ElegantFin-Werkstatt, Skript folgen-ueberschriften:", e);
     }
 })();
+
+// musik-reiter-ansicht: Musik, Reiter „Lieder“ und „Genres“: Ansicht wählbar, saubere Genre-Bilder
+(function () {
+    try {
+/* Musikbibliothek, Reiter „Lieder“ und „Genres“: Ansicht wählbar (Liste, Poster, …), eigene Genre-Bilder
+   (ElegantFin-Werkstatt, Schalter „musik-reiter-ansicht“). Merkt die Wahl je Bibliothek wie Jellyfin (userSettings). */
+(function werkstattAnsicht() {
+        'use strict';
+        try {
+            var G = window.__werkstatt = window.__werkstatt || {};
+            if (G.ansicht) return;
+            G.ansicht = { an: true };
+
+            var SEITE = '#musicRecommendedPage';
+            var MEIN = 'data-werkstatt-ansicht';        // eigene Elemente (Knopf, Leiste, Karten, Zeilen, Menü)
+            var ART_ATTR = 'data-werkstatt-ansichtsart'; // am Behälter: welche eigene Ansicht gerade steht
+            var BILD = 'data-werkstatt-bild';            // Bild, das erst beim Näherkommen geladen wird
+            var NAMEN = { List: 'Liste', Poster: 'Poster', PosterCard: 'Posterkarte', Thumb: 'Miniaturansicht', ThumbCard: 'Miniaturansichtkarte' };
+            var PARALLEL = 6;               // gleichzeitige Abfragen der Genre-Cover
+            var NOCHMAL = 60 * 1000;        // fehlgeschlagene Abfrage frühestens nach einer Minute wiederholen
+
+            // nativ: die Ansicht, die Jellyfin selbst zeichnet (dann bleiben seine Einträge stehen)
+            var ARTEN = [
+                { name: 'lieder', index: '5', endung: '-songs-_view', ansichten: ['List', 'Poster', 'PosterCard'], start: 'List', nativ: 'List' },
+                { name: 'genres', index: '6', endung: '-genres-werkstatt-_view', ansichten: ['List', 'Poster', 'PosterCard', 'Thumb', 'ThumbCard'], start: 'Poster', nativ: null }
+            ];
+
+            var live = null;        // Jellyfins Anzeige-Einstellungen im Speicher (userSettings.displayPrefs)
+            var kandidat = null;    // zuletzt gesendete Kopie; kommt sie ein zweites Mal, ist sie „live“
+            var serverKopie = null; // CustomPrefs vom Server, einmal geholt (bis „live“ bekannt ist)
+            var serverHolt = false;
+            var geschrieben = {};   // in dieser Sitzung gewählte Ansichten: Schlüssel -> Wert
+            var genreDaten = {};    // Genre-Id -> { cover: [{ id, tag }], alben } | { laedt } | { fehlt: Zeit }
+            var zaehler = {};       // Genre-Id -> { alben, lieder }
+            var zaehlerGeholt = {}; // Bibliothek -> true
+            var schlange = [], laufend = 0;
+            var io = null, mo = null, wartet = 0;
+
+            function warn(was, e) {
+                if (window.console) console.warn('Werkstatt: Ansicht, ' + was, e);
+            }
+
+            function an() {
+                try {
+                    return getComputedStyle(document.documentElement).getPropertyValue('--werkstatt-ansicht').trim() === '1';
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function api() {
+                var a = window.ApiClient;
+                return a && typeof a.getCurrentUserId === 'function' ? a : null;
+            }
+
+            function benutzer() {
+                var a = api();
+                if (!a) return '';
+                try { return a.getCurrentUserId() || ''; } catch (e) { return ''; }
+            }
+
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+
+            function layout() {
+                var h = document.documentElement.classList;
+                if (h.contains('layout-mobile')) return 'mobile';
+                if (h.contains('layout-tv')) return 'tv';
+                return 'desktop';
+            }
+
+            function adressParameter() {
+                var p = {};
+                var h = String(window.location.hash || ''), q = h.indexOf('?');
+                if (q < 0) return p;
+                h.slice(q + 1).split('&').forEach(function (t) {
+                    var j = t.indexOf('=');
+                    if (j <= 0) return;
+                    try { p[decodeURIComponent(t.slice(0, j))] = decodeURIComponent(t.slice(j + 1)); } catch (e) { /* kaputter Teil */ }
+                });
+                return p;
+            }
+
+            // cardBuilderUtils.getDefaultColorIndex: Farbe der Ersatzfläche nach dem Namen (1 bis 5)
+            function farbIndex(str) {
+                if (!str) return 1;
+                var c = String(str.slice(Math.floor(str.length / 2), Math.floor(str.length / 2) + 1).charCodeAt(0));
+                var sum = 0;
+                for (var i = 0; i < c.length; i++) sum += parseInt(c.charAt(i), 10);
+                return (parseInt(String(sum).slice(-1), 10) % 5) + 1;
+            }
+
+            function ersatzKlasse(name) {
+                return 'defaultCardBackground defaultCardBackground' + farbIndex(name);
+            }
+
+            // ---------- Merken wie userSettings: localStorage und DisplayPreferences „usersettings“
+
+            function lokal(k) {
+                var u = benutzer();
+                return u ? u + '-' + k : k;
+            }
+
+            function nachtragen(prefs) {
+                Object.keys(geschrieben).forEach(function (k) { prefs.CustomPrefs[k] = geschrieben[k]; });
+            }
+
+            // Jede gesendete Kopie bekommt die gewählten Ansichten dazu, bevor sie zum Server geht
+            function fangen() {
+                var a = window.ApiClient;
+                if (!a || typeof a.updateDisplayPreferences !== 'function' || a.updateDisplayPreferences.__werkstattAnsicht) return;
+                var orig = a.updateDisplayPreferences;
+                var huelle = function (name, prefs) {
+                    try {
+                        if (name === 'usersettings' && prefs && typeof prefs === 'object' && prefs.CustomPrefs && typeof prefs.CustomPrefs === 'object') {
+                            if (prefs !== live) {
+                                if (prefs === kandidat) live = prefs;
+                                else kandidat = prefs;
+                            }
+                            nachtragen(prefs);
+                        }
+                    } catch (e) { /* senden geht trotzdem */ }
+                    return orig.apply(this, arguments);
+                };
+                huelle.__werkstattAnsicht = true;
+                a.updateDisplayPreferences = huelle;
+            }
+
+            function serverKopieHolen() {
+                var a = api(), u = benutzer();
+                if (serverHolt || live || !a || !u || typeof a.getDisplayPreferences !== 'function') return;
+                serverHolt = true;
+                try {
+                    Promise.resolve(a.getDisplayPreferences('usersettings', u, 'emby')).then(function (p) {
+                        serverKopie = (p && p.CustomPrefs) || {};
+                        planen();
+                    }, function () {
+                        serverKopie = {};
+                    });
+                } catch (e) {
+                    serverKopie = {};
+                }
+            }
+
+            function lesen(k) {
+                if (geschrieben[k] != null) return geschrieben[k];
+                if (live && live.CustomPrefs && live.CustomPrefs[k] != null) return String(live.CustomPrefs[k]);
+                var v = null;
+                try { v = window.localStorage.getItem(lokal(k)); } catch (e) { v = null; }
+                if (v) return v;
+                if (serverKopie && serverKopie[k] != null) return String(serverKopie[k]);
+                return null;
+            }
+
+            function schreiben(k, v) {
+                geschrieben[k] = v;
+                try { window.localStorage.setItem(lokal(k), v); } catch (e) { /* privates Fenster */ }
+                var a = api(), u = benutzer();
+                if (!a || !u || typeof a.updateDisplayPreferences !== 'function') return;
+                fangen();
+                try {
+                    if (live) {
+                        live.CustomPrefs[k] = v;
+                        a.updateDisplayPreferences('usersettings', live, u, 'emby');
+                        return;
+                    }
+                    // Jellyfins Kopie noch nicht gesehen: holen, ergänzen, zurückschreiben (wie tweaks-farbe.js)
+                    if (typeof a.getDisplayPreferences !== 'function') return;
+                    Promise.resolve(a.getDisplayPreferences('usersettings', u, 'emby')).then(function (p) {
+                        if (!p) return null;
+                        p.CustomPrefs = p.CustomPrefs || {};
+                        return a.updateDisplayPreferences('usersettings', p, u, 'emby');
+                    }).then(null, function (e) { warn('Speichern', e); });
+                } catch (e) {
+                    warn('Speichern', e);
+                }
+            }
+
+            // ---------- Seite, Reiter, Schlüssel
+
+            function bibliothek(seite) {
+                if (seite.__werkstattTopParentId) return seite.__werkstattTopParentId;
+                if (!seite.classList.contains('hide')) {
+                    var p = adressParameter().topParentId;
+                    if (p) return String(p);
+                }
+                return '';
+            }
+
+            function schluessel(seite, art) {
+                return (bibliothek(seite) || 'werkstatt') + art.endung;
+            }
+
+            function ansicht(seite, art) {
+                var w = lesen(schluessel(seite, art));
+                return art.ansichten.indexOf(w) >= 0 ? w : art.start;
+            }
+
+            function behaelter(tab) {
+                for (var k = tab.firstElementChild; k; k = k.nextElementSibling) {
+                    if (k.classList.contains('itemsContainer')) return k;
+                }
+                return null;
+            }
+
+            // Werkzeugleiste vor dem Behälter (Jellyfins Klassen: flex … focuscontainer-x)
+            function leisteFinden(tab) {
+                for (var k = tab.firstElementChild; k; k = k.nextElementSibling) {
+                    if (k.classList.contains('itemsContainer')) return null;
+                    if (k.classList.contains('focuscontainer-x') && k.classList.contains('flex')) return k;
+                }
+                return null;
+            }
+
+            // ---------- Knopf und Menü
+
+            function knopfHerstellen(seite, tab, art) {
+                var knopf = tab.querySelector('.btnSelectView');
+                if (knopf && !knopf.hasAttribute(MEIN)) {
+                    // Im echten Jellyfin hat keiner der beiden Reiter einen; bringt eine spätere Fassung ihn mit,
+                    // bedient Jellyfin ihn selbst und das Skript hält sich aus diesem Reiter heraus
+                    if (api()) return null;
+                    // Werkstatt: die Nachbildung zeigt schon einen Knopf ohne Funktion, den übernehmen
+                    knopf.setAttribute(MEIN, 'uebernommen');
+                }
+                if (!knopf) {
+                    var leiste = leisteFinden(tab);
+                    if (!leiste) {
+                        leiste = document.createElement('div');
+                        leiste.className = 'flex align-items-center justify-content-center flex-wrap-wrap padded-top padded-left padded-right padded-bottom focuscontainer-x';
+                        leiste.setAttribute(MEIN, 'leiste');
+                        tab.insertBefore(leiste, tab.firstChild);
+                    }
+                    knopf = document.createElement('button');
+                    knopf.type = 'button';
+                    knopf.setAttribute('is', 'paper-icon-button-light');
+                    knopf.className = 'btnSelectView autoSize paper-icon-button-light';
+                    knopf.title = 'Ansicht wählen';
+                    knopf.setAttribute(MEIN, 'knopf');
+                    knopf.innerHTML = '<span class="material-icons view_comfy" aria-hidden="true"></span>';
+                    // Stelle wie in music.html bei „Alben“: vor Sortieren, sonst vor Filter, sonst ans Ende
+                    var vor = null;
+                    for (var k = leiste.firstElementChild; k; k = k.nextElementSibling) {
+                        if (k.classList.contains('btnSort')) { vor = k; break; }
+                        if (!vor && (k.classList.contains('btnFilter-wrapper') || k.classList.contains('btnFilter'))) vor = k;
+                    }
+                    leiste.insertBefore(knopf, vor);
+                }
+                if (!knopf.__werkstattAnsicht) {
+                    knopf.__werkstattAnsicht = { seite: seite, tab: tab, art: art };
+                    knopf.addEventListener('click', klick);
+                    knopf.addEventListener('layoutchange', gewechselt);
+                }
+                return knopf;
+            }
+
+            function klick(e) {
+                var k = e.currentTarget, info = k && k.__werkstattAnsicht;
+                if (!info || !an()) return;
+                e.preventDefault();
+                var jetzt = ansicht(info.seite, info.art);
+                var LB = window.LibraryBrowser;
+                try {
+                    if (LB && typeof LB.showLayoutMenu === 'function') LB.showLayoutMenu(k, jetzt, info.art.ansichten.slice());
+                    else menue(k, jetzt, info.art.ansichten);
+                } catch (x) {
+                    warn('Menü', x);
+                }
+            }
+
+            function gewechselt(e) {
+                var k = e.currentTarget, info = k && k.__werkstattAnsicht;
+                var v = e.detail && e.detail.viewStyle;
+                if (!info || !an() || info.art.ansichten.indexOf(v) < 0) return;
+                schreiben(schluessel(info.seite, info.art), v);
+                pruefen();
+            }
+
+            function menueZu() {
+                document.querySelectorAll('[' + MEIN + '="menue"]').forEach(function (x) { if (x.parentNode) x.parentNode.removeChild(x); });
+                document.removeEventListener('keydown', menueTaste, true);
+            }
+
+            function menueTaste(e) {
+                if (e.key === 'Escape') menueZu();
+            }
+
+            // Werkstatt: kleines Menü mit den Klassen von components/actionSheet (gleiches Ereignis wie Jellyfins Menü)
+            function menue(knopf, jetzt, ansichten) {
+                menueZu();
+                var r = knopf.getBoundingClientRect();
+                var grund = document.createElement('div');
+                grund.className = 'dialogBackdrop dialogBackdropOpened';
+                grund.setAttribute(MEIN, 'menue');
+                var huelle = document.createElement('div');
+                huelle.className = 'dialogContainer';
+                huelle.setAttribute(MEIN, 'menue');
+                var html = '<div class="focuscontainer dialog actionsheet-not-fullscreen actionSheet centeredDialog opened" style="position:fixed;margin:0;' +
+                    'left:' + Math.max(8, Math.round(r.left)) + 'px;top:' + Math.round(r.bottom + 4) + 'px;">' +
+                    '<div class="actionSheetContent"><div class="actionSheetScroller scrollY">';
+                ansichten.forEach(function (v) {
+                    html += '<button is="emby-button" type="button" class="listItem listItem-button actionSheetMenuItem emby-button" data-id="' + esc(v) + '">' +
+                        '<span class="actionsheetMenuItemIcon listItemIcon listItemIcon-transparent material-icons check" aria-hidden="true"' +
+                        (v === jetzt ? '' : ' style="visibility:hidden;"') + '></span>' +
+                        '<div class="listItemBody actionsheetListItemBody"><div class="listItemBodyText actionSheetItemText">' + esc(NAMEN[v] || v) + '</div></div></button>';
+                });
+                html += '</div></div></div>';
+                huelle.innerHTML = html;
+                huelle.addEventListener('click', function (e) {
+                    var b = e.target.closest && e.target.closest('.actionSheetMenuItem');
+                    menueZu();
+                    if (!b) return;
+                    knopf.dispatchEvent(new CustomEvent('layoutchange', { detail: { viewStyle: b.getAttribute('data-id') }, bubbles: true, cancelable: false }));
+                });
+                grund.addEventListener('click', menueZu);
+                document.body.appendChild(grund);
+                document.body.appendChild(huelle);
+                document.addEventListener('keydown', menueTaste, true);
+            }
+
+            // ---------- Daten aus Jellyfins Markup
+
+            function datenAttribute(el) {
+                var s = '';
+                for (var i = 0; i < el.attributes.length; i++) {
+                    var a = el.attributes[i];
+                    if (a.name.indexOf('data-') !== 0) continue;
+                    if (a.name === 'data-index' || a.name === 'data-action' || a.name === 'data-prefix' || a.name === MEIN) continue;
+                    s += ' ' + a.name + '="' + esc(a.value) + '"';
+                }
+                return s;
+            }
+
+            function stilBild(el) {
+                var m = /url\(\s*(['"]?)(.*?)\1\s*\)/.exec((el && el.style && el.style.backgroundImage) || '');
+                return m ? m[2] : '';
+            }
+
+            // Bildadresse der Liste (fillWidth/fillHeight 80) auf Kartengröße bringen (Seitenverhältnis bleibt 1:1)
+            function groesser(url, px) {
+                if (!url) return '';
+                return url.replace(/([?&])(fillWidth|fillHeight|maxWidth|maxHeight|width|height)=\d+/gi, function (m, vor, name) {
+                    return vor + name + '=' + px;
+                });
+            }
+
+            // Eine Zeile aus songs.js (listView): Titel, Interpreten, Bild, Favorit
+            function liedAusZeile(el) {
+                if (!el.classList.contains('listItem')) return null;
+                var texte = el.querySelectorAll('.listItemBody .listItemBodyText');
+                var bild = el.querySelector('.listItemImage');
+                var fav = el.querySelector('[data-isfavorite]');
+                var dpr = Math.min(window.devicePixelRatio || 1, 3);
+                return {
+                    attr: datenAttribute(el),
+                    id: el.getAttribute('data-id') || '',
+                    serverId: el.getAttribute('data-serverid') || '',
+                    titel: texte[0] ? texte[0].textContent.trim() : '',
+                    kuenstler: texte[1] ? texte[1].textContent.trim() : '',
+                    bild: groesser(bild ? (bild.getAttribute('data-src') || stilBild(bild)) : '', Math.round(320 * dpr)),
+                    favorit: fav ? fav.getAttribute('data-isfavorite') : null,
+                    likes: fav ? (fav.getAttribute('data-likes') || '') : ''
+                };
+            }
+
+            // Eine Karte aus musicgenres.js (cardBuilder): Id, Name, Link, Titelzeile und Hover-Knöpfe übernehmen
+            function genreAusKarte(el) {
+                if (!el.classList.contains('card')) return null;
+                var bild = el.querySelector('.cardImageContainer');
+                var titel = null;
+                el.querySelectorAll('.cardText').forEach(function (t) {
+                    if (!titel && !t.classList.contains('cardDefaultText')) titel = t;
+                });
+                var name = (bild && bild.getAttribute('aria-label')) || (titel ? titel.textContent.trim() : '');
+                var overlay = '', mobil = '';
+                var sc = el.querySelector('.cardScalable');
+                if (sc) {
+                    for (var k = sc.firstElementChild; k; k = k.nextElementSibling) {
+                        if (k.classList.contains('cardOverlayContainer')) overlay += k.outerHTML;
+                        else if (k.classList.contains('cardOverlayButton')) mobil += k.outerHTML;
+                    }
+                }
+                return {
+                    attr: datenAttribute(el),
+                    id: el.getAttribute('data-id') || '',
+                    serverId: el.getAttribute('data-serverid') || '',
+                    typ: el.getAttribute('data-type') || 'MusicGenre',
+                    name: name,
+                    href: (bild && bild.getAttribute('href')) || '#',
+                    titelHtml: titel ? titel.innerHTML : '<bdi>' + esc(name) + '</bdi>',
+                    overlay: overlay,
+                    mobil: mobil
+                };
+            }
+
+            // ---------- Genre-Cover und Zähler (window.ApiClient)
+
+            function abfrage() {
+                while (laufend < PARALLEL && schlange.length) {
+                    laufend++;
+                    (schlange.shift())(function () {
+                        laufend--;
+                        abfrage();
+                    });
+                }
+            }
+
+            function coverHolen(a, u, pid, g) {
+                genreDaten[g.id] = { laedt: true };
+                schlange.push(function (fertig) {
+                    var erledigt = false;
+                    var ende = function (res) {
+                        if (erledigt) return;
+                        erledigt = true;
+                        if (res) {
+                            var gesehen = {}, cover = [];
+                            (res.Items || []).forEach(function (it) {
+                                var tag = it && it.ImageTags && it.ImageTags.Primary;
+                                if (!tag || gesehen[tag] || cover.length >= 4) return;
+                                gesehen[tag] = true;
+                                cover.push({ id: it.Id, tag: tag });
+                            });
+                            genreDaten[g.id] = { cover: cover, alben: res.TotalRecordCount };
+                        } else {
+                            genreDaten[g.id] = { fehlt: Date.now() };
+                        }
+                        veraltet();
+                        fertig();
+                    };
+                    setTimeout(function () { ende(null); }, 10000);
+                    try {
+                        var q = {
+                            IncludeItemTypes: 'MusicAlbum',
+                            Recursive: true,
+                            GenreIds: g.id,
+                            SortBy: 'ProductionYear,PremiereDate,SortName',
+                            SortOrder: 'Descending',
+                            Limit: 12,
+                            ImageTypeLimit: 1,
+                            EnableImageTypes: 'Primary',
+                            EnableUserData: false,
+                            EnableTotalRecordCount: true
+                        };
+                        if (pid) q.ParentId = pid;
+                        Promise.resolve(a.getItems(u, q)).then(function (res) { ende(res || { Items: [] }); }, function () { ende(null); });
+                    } catch (e) {
+                        ende(null);
+                    }
+                });
+            }
+
+            function zaehlerHolen(a, u, pid) {
+                if (zaehlerGeholt[pid] || typeof a.getGenres !== 'function') return;
+                zaehlerGeholt[pid] = true;
+                try {
+                    var q = { Recursive: true, Fields: 'ItemCounts', SortBy: 'SortName', SortOrder: 'Ascending', EnableImages: false, EnableTotalRecordCount: false };
+                    if (pid) q.ParentId = pid;
+                    Promise.resolve(a.getGenres(u, q)).then(function (res) {
+                        ((res && res.Items) || []).forEach(function (it) {
+                            if (it && it.Id) zaehler[it.Id] = { alben: it.AlbumCount, lieder: it.SongCount };
+                        });
+                        veraltet();
+                    }, function () { zaehlerGeholt[pid] = false; });
+                } catch (e) {
+                    zaehlerGeholt[pid] = false;
+                }
+            }
+
+            function genresHolen(seite, daten) {
+                var a = api(), u = benutzer();
+                if (!a || !u || typeof a.getItems !== 'function') return;
+                var pid = bibliothek(seite);
+                zaehlerHolen(a, u, pid);
+                var jetzt = Date.now();
+                daten.forEach(function (g) {
+                    if (!g.id) return;
+                    var e = genreDaten[g.id];
+                    if (!e || (e.fehlt && jetzt - e.fehlt > NOCHMAL)) coverHolen(a, u, pid, g);
+                });
+                abfrage();
+            }
+
+            // Neue Daten: Genre-Behälter neu zeichnen lassen
+            function veraltet() {
+                document.querySelectorAll(SEITE + ' .pageTabContent[data-index="6"] > .itemsContainer').forEach(function (c) {
+                    c.__werkstattVeraltet = true;
+                });
+                planen();
+            }
+
+            function bildUrl(c, px) {
+                var a = api();
+                if (!a || typeof a.getScaledImageUrl !== 'function') return '';
+                try {
+                    return a.getScaledImageUrl(c.id, { type: 'Primary', tag: c.tag, fillWidth: px, fillHeight: px, quality: 90 }) || '';
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            function zahlenText(g) {
+                var z = zaehler[g.id] || {}, d = genreDaten[g.id] || {};
+                var alben = z.alben != null ? z.alben : d.alben;
+                var teile = [];
+                if (alben) teile.push(alben + (alben === 1 ? ' Album' : ' Alben'));
+                if (z.lieder) teile.push(z.lieder + (z.lieder === 1 ? ' Lied' : ' Lieder'));
+                return teile.join(' · ');
+            }
+
+            // ---------- Bausteine wie cardBuilder.buildCard und listView.getListViewHtml
+
+            function bildAttr(url) {
+                return url ? ' ' + BILD + '="' + esc(url) + '"' : '';
+            }
+
+            function knopfHtml(klasse, aktion, icon, titel, iconKlasse) {
+                return '<button is="paper-icon-button-light" class="' + klasse + ' paper-icon-button-light" data-action="' + aktion + '"' +
+                    (titel ? ' title="' + esc(titel) + '"' : '') + '><span class="material-icons ' + (iconKlasse ? iconKlasse + ' ' : '') + icon + '" aria-hidden="true"></span></button>';
+            }
+
+            function favoritHtml(d, klasse, iconKlasse, typ) {
+                if (d.favorit == null) return '';
+                return '<button is="emby-ratingbutton" type="button" data-action="none" class="' + klasse + ' paper-icon-button-light" data-id="' + esc(d.id) +
+                    '" data-serverid="' + esc(d.serverId) + '" data-itemtype="' + typ + '" data-likes="' + esc(d.likes) + '" data-isfavorite="' + esc(d.favorit) + '">' +
+                    '<span class="material-icons ' + (iconKlasse ? iconKlasse + ' ' : '') + 'favorite" aria-hidden="true"></span></button>';
+            }
+
+            // Textzeilen unter dem Bild (getCardFooterText): ohne Kartenform direkt in cardBox, mit Kartenform in .cardFooter
+            function fusszeilen(zeilen, o) {
+                var html = '', kl = o.zentriert ? 'cardText cardTextCentered' : 'cardText';
+                zeilen.forEach(function (z, i) {
+                    html += "<div class='" + kl + (i ? ' cardText-secondary' : ' cardText-first') + "'>" + (z || '&nbsp;') + '</div>';
+                });
+                if (!o.karte) return html;
+                var mehr = o.mobil ? '<button is="paper-icon-button-light" class="itemAction btnCardOptions cardText-secondary paper-icon-button-light" data-action="menu" title="Mehr"><span class="material-icons more_vert" aria-hidden="true"></span></button>' : '';
+                return '<div class="cardFooter">' + mehr + html + '</div>';
+            }
+
+            // o: form, karte, zentriert, attr, index, art, href, aktion, label, bildKlasse, bildInhalt, bildUrl, padder, overlay, zeilen, musik
+            function karteHtml(o) {
+                var l = layout();
+                var klasse = 'card ' + o.form + 'Card' + (l === 'desktop' ? ' card-hoverable' : '') + (o.musik ? '' : ' card-withuserdata');
+                var box = o.karte ? 'cardBox visualCardBox' : 'cardBox cardBox-bottompadded';
+                return '<div data-index="' + o.index + '"' + o.attr + ' class="' + klasse + '" ' + MEIN + '="' + o.art + '"><div class="' + box + '">' +
+                    '<div class="cardScalable"><div class="cardPadder cardPadder-' + o.form + '">' + (o.padder || '') + '</div>' +
+                    '<a href="' + esc(o.href) + '" data-action="' + o.aktion + '" class="' + o.bildKlasse + ' cardContent itemAction"' + bildAttr(o.bildUrl) +
+                    ' aria-label="' + esc(o.label) + '" role="img">' + (o.bildInhalt || '') + '</a>' + (o.overlay || '') + '</div>' +
+                    fusszeilen(o.zeilen, { zentriert: o.zentriert, karte: o.karte, mobil: l === 'mobile' }) + '</div></div>';
+            }
+
+            function liedHtml(d, i, v) {
+                var l = layout(), karte = v === 'PosterCard';
+                var icon = '<span class="cardImageIcon material-icons audiotrack" aria-hidden="true"></span>';
+                var overlay = '';
+                if (l === 'desktop') {
+                    var b = 'cardOverlayButton cardOverlayButton-hover itemAction';
+                    overlay = '<div class="cardOverlayContainer itemAction" data-action="playallfromhere">' +
+                        knopfHtml(b + ' cardOverlayFab-primary', 'playallfromhere', 'play_arrow', 'Abspielen', 'cardOverlayButtonIcon cardOverlayButtonIcon-hover') +
+                        '<div class="cardOverlayButton-br flex">' + favoritHtml(d, b, 'cardOverlayButtonIcon cardOverlayButtonIcon-hover', 'Audio') +
+                        knopfHtml(b, 'menu', 'more_vert', 'Mehr', 'cardOverlayButtonIcon cardOverlayButtonIcon-hover') + '</div></div>';
+                } else if (l === 'mobile' && !karte) {
+                    overlay = knopfHtml('cardOverlayButton cardOverlayButton-br itemAction', 'menu', 'more_vert', 'Mehr', 'cardOverlayButtonIcon');
+                }
+                return karteHtml({
+                    form: 'square', karte: karte, zentriert: !karte, musik: true, attr: d.attr, index: i, art: 'lied',
+                    href: d.id ? '#/details?id=' + d.id + (d.serverId ? '&serverId=' + d.serverId : '') : '#',
+                    aktion: 'playallfromhere', label: d.titel,
+                    bildKlasse: d.bild ? 'cardImageContainer coveredImage' : 'cardImageContainer ' + ersatzKlasse(d.titel),
+                    bildUrl: d.bild, bildInhalt: d.bild ? '' : icon, padder: d.bild ? icon : '',
+                    overlay: overlay,
+                    zeilen: ['<bdi>' + esc(d.titel) + '</bdi>', d.kuenstler ? '<bdi>' + esc(d.kuenstler) + '</bdi>' : '']
+                });
+            }
+
+            // Fläche einer Genre-Karte: Raster, einzelnes Cover, Band (Miniaturansicht) oder Ersatz mit Namen
+            function genreBild(g, form) {
+                var e = genreDaten[g.id];
+                var cover = (e && e.cover) || [];
+                var urls = function (n, px) { return cover.slice(0, n).map(function (c) { return bildUrl(c, px); }).filter(Boolean); };
+                if (form === 'backdrop') {
+                    var reihe = urls(3, 280);
+                    if (reihe.length) {
+                        return {
+                            klasse: 'cardImageContainer werkstattGenreBild werkstattGenreBild-band',
+                            inhalt: '<div class="werkstattGenreBild-grund"' + bildAttr(reihe[0]) + '></div><div class="werkstattGenreBild-reihe">' +
+                                reihe.map(function (u) { return '<div class="werkstattGenreBild-teil"' + bildAttr(u) + '></div>'; }).join('') + '</div>'
+                        };
+                    }
+                } else if (cover.length >= 4) {
+                    var vier = urls(4, 200);
+                    if (vier.length === 4) {
+                        return {
+                            klasse: 'cardImageContainer werkstattGenreBild werkstattGenreBild-raster',
+                            inhalt: vier.map(function (u) { return '<div class="werkstattGenreBild-teil"' + bildAttr(u) + '></div>'; }).join('')
+                        };
+                    }
+                } else if (cover.length) {
+                    var eins = urls(1, 400);
+                    if (eins.length) return { klasse: 'cardImageContainer coveredImage', url: eins[0], inhalt: '' };
+                }
+                // Lädt noch: leere Fläche (sonst stünde kurz der Name da); sonst wie Jellyfin ohne Bild der Name
+                var laedt = !!(api() && g.id && (!e || e.laedt));
+                return {
+                    klasse: 'cardImageContainer ' + ersatzKlasse(g.name) + (laedt ? ' werkstattGenreBild-laedt' : ''),
+                    inhalt: laedt ? '' : '<div class="cardText cardDefaultText">' + esc(g.name) + '</div>'
+                };
+            }
+
+            function genreKarteHtml(g, i, v) {
+                var l = layout(), form = v.indexOf('Thumb') === 0 ? 'backdrop' : 'square', karte = /Card$/.test(v);
+                var b = genreBild(g, form);
+                var overlay = l === 'desktop' ? g.overlay : (l === 'mobile' && !karte ? g.mobil : '');
+                var zeilen = [g.titelHtml];
+                if (karte) {
+                    var z = zahlenText(g);
+                    zeilen.push(z ? '<bdi>' + esc(z) + '</bdi>' : '');
+                }
+                return karteHtml({
+                    form: form, karte: karte, zentriert: !karte, musik: false, attr: g.attr, index: i, art: 'genre',
+                    href: g.href, aktion: 'link', label: g.name,
+                    bildKlasse: b.klasse, bildUrl: b.url || '', bildInhalt: b.inhalt, padder: '',
+                    overlay: overlay, zeilen: zeilen
+                });
+            }
+
+            function genreZeileHtml(g, i) {
+                var e = genreDaten[g.id], c = e && e.cover && e.cover[0];
+                var url = c ? bildUrl(c, 80) : '';
+                var bild = url ?
+                    '<div data-action="link" class="listItemImage itemAction"' + bildAttr(url) + ' item-icon></div>' :
+                    '<div class="listItemImage cardImageContainer ' + ersatzKlasse(g.name) + '"><span class="cardImageIcon material-icons queue_music" aria-hidden="true"></span></div>';
+                var z = zahlenText(g);
+                return '<div class="listItem listItem-border" data-action="link"' + g.attr + ' ' + MEIN + '="genre">' + bild +
+                    '<div class="listItemBody itemAction"><div class="listItemBodyText"><bdi>' + esc(g.name) + '</bdi></div>' +
+                    (z ? '<div class="secondary listItemBodyText"><bdi>' + esc(z) + '</bdi></div>' : '') + '</div>' +
+                    '<div class="listViewUserDataButtons">' + knopfHtml('listItemButton itemAction', 'menu', 'more_vert', 'Mehr') + '</div></div>';
+            }
+
+            // ---------- Bilder erst beim Näherkommen laden (wie components/lazyLoader)
+
+            function bildSetzen(el) {
+                var u = el.getAttribute(BILD);
+                el.removeAttribute(BILD);
+                if (!u) return;
+                el.style.backgroundImage = "url('" + u.replace(/'/g, '%27') + "')";
+                el.classList.add('lazy-image-fadein-fast');
+            }
+
+            function bilderLaden(c) {
+                var els = [];
+                c.querySelectorAll('[' + BILD + ']').forEach(function (el) { els.push(el); });
+                if (!els.length) return;
+                if (typeof window.IntersectionObserver !== 'function') { els.forEach(bildSetzen); return; }
+                if (!io) {
+                    io = new window.IntersectionObserver(function (eintraege) {
+                        eintraege.forEach(function (e) {
+                            if (!e.isIntersecting) return;
+                            io.unobserve(e.target);
+                            bildSetzen(e.target);
+                        });
+                    }, { rootMargin: '50%', threshold: 0 });
+                }
+                els.forEach(function (el) { io.observe(el); });
+            }
+
+            // ---------- Behälter umstellen
+
+            function entfernen(knoten) {
+                knoten.forEach(function (n) {
+                    if (io) {
+                        if (n.hasAttribute(BILD)) io.unobserve(n);
+                        n.querySelectorAll('[' + BILD + ']').forEach(function (x) { io.unobserve(x); });
+                    }
+                    if (n.parentNode) n.parentNode.removeChild(n);
+                });
+            }
+
+            // Jellyfins Einträge (Zeilen, Karten) und eigene; anderes (fremde Überschriften o. ä.) bleibt stehen
+            function teile(c) {
+                var fremd = [], mein = [];
+                for (var k = c.firstElementChild; k; k = k.nextElementSibling) {
+                    if (k.hasAttribute(MEIN)) mein.push(k);
+                    else if (k.hasAttribute('data-id') || k.classList.contains('card') || k.classList.contains('listItem')) fremd.push(k);
+                }
+                return { fremd: fremd, mein: mein };
+            }
+
+            function klassen(c, v, nativ) {
+                if (!c.__werkstattKlassen) {
+                    c.__werkstattKlassen = { list: c.classList.contains('vertical-list'), wrap: c.classList.contains('vertical-wrap') };
+                }
+                var k = c.__werkstattKlassen;
+                if (nativ) {
+                    c.classList.toggle('vertical-list', k.list);
+                    c.classList.toggle('vertical-wrap', k.wrap);
+                    c.removeAttribute(ART_ATTR);
+                    return;
+                }
+                // wie musicalbums.js onViewStyleChange: Liste untereinander, sonst Raster
+                c.classList.toggle('vertical-list', v === 'List');
+                c.classList.toggle('vertical-wrap', v !== 'List');
+                c.setAttribute(ART_ATTR, v);
+            }
+
+            function zeichnen(seite, art, c, v) {
+                var daten = c.__werkstattVorrat.daten;
+                var html = daten.map(function (d, i) {
+                    if (art.name === 'lieder') return liedHtml(d, i, v);
+                    return v === 'List' ? genreZeileHtml(d, i) : genreKarteHtml(d, i, v);
+                }).join('');
+                klassen(c, v, false);
+                c.insertAdjacentHTML('beforeend', html);
+                c.__werkstattGezeigt = v;
+                c.__werkstattVeraltet = false;
+                bilderLaden(c);
+                if (art.name === 'genres') genresHolen(seite, daten);
+            }
+
+            function zurueckZuJellyfin(c, v) {
+                var vorrat = c.__werkstattVorrat;
+                c.__werkstattVorrat = null;
+                if (vorrat) vorrat.knoten.forEach(function (n) { c.appendChild(n); });
+                klassen(c, v, true);
+                c.__werkstattGezeigt = v;
+            }
+
+            function ordnen(seite, tab, art, c) {
+                var v = ansicht(seite, art);
+                var t = teile(c);
+                if (t.fremd.length) {
+                    // Jellyfin hat (neu) gezeichnet
+                    entfernen(t.mein);
+                    if (art.nativ && v === art.nativ) {
+                        c.__werkstattVorrat = null;
+                        if (c.__werkstattKlassen) klassen(c, v, true);
+                        c.__werkstattGezeigt = v;
+                        return;
+                    }
+                    var daten = t.fremd.map(art.name === 'lieder' ? liedAusZeile : genreAusKarte).filter(Boolean);
+                    t.fremd.forEach(function (n) { c.removeChild(n); });
+                    c.__werkstattVorrat = { knoten: t.fremd, daten: daten };
+                    zeichnen(seite, art, c, v);
+                    return;
+                }
+                if (!t.mein.length || !c.__werkstattVorrat) {
+                    // Leer gezeichnet (etwa ein Filter ohne Treffer) oder nichts von uns
+                    entfernen(t.mein);
+                    c.__werkstattVorrat = null;
+                    c.__werkstattGezeigt = null;
+                    return;
+                }
+                if (c.__werkstattGezeigt === v && !c.__werkstattVeraltet) return;
+                entfernen(t.mein);
+                if (art.nativ && v === art.nativ) zurueckZuJellyfin(c, v);
+                else zeichnen(seite, art, c, v);
+            }
+
+            // Alles zurücknehmen (CSS fehlt, Schalter aus)
+            function zurueck() {
+                menueZu();
+                document.querySelectorAll('[' + ART_ATTR + '], .itemsContainer').forEach(function (c) {
+                    if (!c.__werkstattKlassen && !c.__werkstattVorrat) return;
+                    entfernen(teile(c).mein);
+                    if (c.__werkstattVorrat) c.__werkstattVorrat.knoten.forEach(function (n) { c.appendChild(n); });
+                    c.__werkstattVorrat = null;
+                    if (c.__werkstattKlassen) klassen(c, null, true);
+                    c.__werkstattKlassen = null;
+                    c.__werkstattGezeigt = null;
+                });
+                document.querySelectorAll('[' + MEIN + '="knopf"]').forEach(function (k) {
+                    var leiste = k.parentNode;
+                    leiste.removeChild(k);
+                    if (leiste.getAttribute(MEIN) === 'leiste' && !leiste.firstElementChild && leiste.parentNode) leiste.parentNode.removeChild(leiste);
+                });
+                document.querySelectorAll('[' + MEIN + '="leiste"]').forEach(function (l) {
+                    if (!l.firstElementChild && l.parentNode) l.parentNode.removeChild(l);
+                });
+            }
+
+            function pruefen() {
+                wartet = 0;
+                try {
+                    fangen();
+                    if (!an()) {
+                        zurueck();
+                    } else {
+                        serverKopieHolen();
+                        document.querySelectorAll(SEITE).forEach(function (seite) {
+                            ARTEN.forEach(function (art) {
+                                var tab = seite.querySelector('.pageTabContent[data-index="' + art.index + '"]');
+                                if (!tab) return;
+                                if (!knopfHerstellen(seite, tab, art)) return;
+                                var c = behaelter(tab);
+                                if (c) ordnen(seite, tab, art, c);
+                            });
+                        });
+                    }
+                } catch (e) {
+                    warn('Prüfen', e);
+                }
+                // Die eigenen Änderungen nicht noch einmal melden lassen (sonst liefe der Observer im Kreis)
+                if (mo) mo.takeRecords();
+            }
+
+            function planen() {
+                if (!wartet) wartet = setTimeout(pruefen, 0);
+            }
+
+            // ---------- Ereignisse und Observer
+
+            // Bibliothek der Seite merken (viewshow trägt params.topParentId; Capture läuft vor Jellyfins Zuhörern)
+            document.addEventListener('viewshow', function (e) {
+                try {
+                    var el = e.target;
+                    if (el && el.nodeType === 1 && el.id === 'musicRecommendedPage') {
+                        var p = e.detail && e.detail.params;
+                        if (p && p.topParentId) el.__werkstattTopParentId = String(p.topParentId);
+                        planen();
+                    }
+                } catch (x) { /* nichts */ }
+            }, true);
+
+            function istStil(n) {
+                return n && (n.nodeName === 'STYLE' || n.nodeName === 'LINK');
+            }
+
+            var REITER_SEL = SEITE + ' .pageTabContent[data-index="5"], ' + SEITE + ' .pageTabContent[data-index="6"]';
+
+            function wichtig(r) {
+                var t = r.target, i, n;
+                if (istStil(t) || t === document.head) return true;
+                for (i = 0; i < r.addedNodes.length; i++) {
+                    n = r.addedNodes[i];
+                    if (istStil(n)) return true;
+                    if (n.nodeType === 1 && (n.id === 'musicRecommendedPage' || (n.querySelector && n.querySelector(SEITE)))) return true;
+                }
+                for (i = 0; i < r.removedNodes.length; i++) if (istStil(r.removedNodes[i])) return true;
+                return !!(t.nodeType === 1 && t.closest && t.closest(REITER_SEL));
+            }
+
+            G.ansicht = { an: true, pruefen: pruefen, lesen: lesen, ansicht: ansicht };
+
+            var starten = function () {
+                try {
+                    mo = new MutationObserver(function (records) {
+                        try {
+                            for (var i = 0; i < records.length; i++) {
+                                // Gleich hier (vor dem Zeichnen), damit Jellyfins Liste nicht erst aufblitzt
+                                if (wichtig(records[i])) { pruefen(); return; }
+                            }
+                        } catch (e) { /* nichts */ }
+                    });
+                    mo.observe(document.documentElement, { childList: true, subtree: true });
+                } catch (e) { /* ohne Observer nur der erste Durchlauf */ }
+                planen();
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', starten);
+            else starten();
+        } catch (e) {
+            if (window.console) console.warn('Werkstatt: Ansicht', e);
+        }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript musik-reiter-ansicht:", e);
+    }
+})();
+
+// musik-abspielen-zufall: Musik: Abspielen und Zufall auf allen Reitern und Unterseiten
+(function () {
+    try {
+/* Musik: „Abspielen“ und „Zufall“ auf allen Reitern und alle Lieder gemischt auf den Unterseiten
+   (ElegantFin-Werkstatt, Schalter „musik-abspielen-zufall“). */
+(function werkstattAbspielen() {
+        'use strict';
+        try {
+            var G = window.__werkstatt = window.__werkstatt || {};
+            if (G.abspielen) return;
+
+            var MAX_LIEDER = 5000;      // je Klick höchstens so viele Lieder
+            var ERSTER_TEIL = 300;      // so viele nimmt playbackManager.play({ ids }) mit (getItemsForPlayback)
+            var FERN_MAX = 300;         // an ein ferngesteuertes Gerät (Ids stehen dort in der Adresse)
+            var WARTEN_MAX = 60000;     // so lange wartet ein Start über die Nachricht auf den Manager
+            var SEITE = 'musicRecommendedPage';
+            var KNOPF = 'werkstattAbspielen';
+            var LEISTE = 'werkstattAbspielenLeiste';
+            var ERSETZT = 'data-werkstatt-abspielen-ersetzt';
+            var MUSIK = 'data-werkstatt-musik';
+            var LEISTEN_KLASSEN = 'flex align-items-center justify-content-center flex-wrap-wrap padded-top padded-left padded-right padded-bottom focuscontainer-x';
+            var TITEL = 'Album,ParentIndexNumber,IndexNumber,SortName';   // Jellyfins Reihenfolge innerhalb der Bibliothek
+
+            // Reiter von music.html; vorn: Sortierfelder vor Album/CD/Titel (null: Jellyfins Reihenfolge)
+            var REITER = {
+                albumsTab: { art: 'alben' },
+                albumArtistsTab: { vorn: 'AlbumArtist' },
+                artistsTab: { vorn: 'Artist' },
+                playlistsTab: { vorn: null },
+                songsTab: { art: 'lieder' },
+                genresTab: { vorn: null }
+            };
+
+            var z = {
+                mgr: null,
+                haken: null,
+                ausstehend: null,   // Start über die Nachricht: { erste, anzahl, rest, zufall, zeit }
+                typen: {},          // Detailseite: Id: { Type, MediaType } oder { laeuft: true }
+                wartet: 0,
+                mo: null
+            };
+            G.abspielen = { zustand: z };
+
+            function warn(was, e) {
+                if (window.console) console.warn('Werkstatt: Abspielen, ' + was, e);
+            }
+
+            function an() {
+                try {
+                    return getComputedStyle(document.documentElement).getPropertyValue('--werkstatt-abspielen').trim() === '1';
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function api() {
+                var a = window.ApiClient;
+                return a && typeof a.getItems === 'function' && typeof a.getCurrentUserId === 'function' ? a : null;
+            }
+
+            function ev() {
+                var E = window.Events;
+                return E && typeof E.trigger === 'function' && typeof E.on === 'function' && typeof E.off === 'function' ? E : null;
+            }
+
+            function adressParameter() {
+                var p = {};
+                var h = String(window.location.hash || ''), q = h.indexOf('?');
+                if (q < 0) return p;
+                h.slice(q + 1).split('&').forEach(function (t) {
+                    var j = t.indexOf('=');
+                    if (j <= 0) return;
+                    try { p[decodeURIComponent(t.slice(0, j))] = decodeURIComponent(t.slice(j + 1)); } catch (e) { /* kaputter Teil */ }
+                });
+                return p;
+            }
+
+            // ---------- playbackManager finden (wie tweaks-fortsetzen.js)
+
+            function istManager(o) {
+                return !!o && typeof o === 'object' &&
+                    typeof o.getCurrentPlayer === 'function' && typeof o.play === 'function' &&
+                    typeof o.queue === 'function' && typeof o.getPlaylist === 'function' &&
+                    typeof o.setQueueShuffleMode === 'function' && typeof o.shuffle === 'function';
+            }
+
+            function manager() {
+                if (!z.mgr && G.playbackManager && istManager(G.playbackManager)) gefunden(G.playbackManager);
+                return z.mgr;
+            }
+
+            function gefunden(m) {
+                if (z.mgr || !istManager(m)) return;
+                z.mgr = m;
+                if (!G.playbackManager) G.playbackManager = m;
+                hakenLoesen();
+                var E = ev();
+                if (E) E.on(m, 'playbackstart', function () {
+                    try { nachholen(0); } catch (e) { warn('Start', e); }
+                });
+                if (z.ausstehend) nachholen(0);
+            }
+
+            function haken() {
+                var E = ev();
+                if (!E || z.haken || z.mgr) return;
+                var orig = E.trigger;
+                var huelle = function (obj) {
+                    if (!z.mgr) {
+                        try {
+                            if (G.playbackManager) gefunden(G.playbackManager);
+                            else if (istManager(obj)) gefunden(obj);
+                        } catch (e) { warn('Suche', e); }
+                    }
+                    return orig.apply(this, arguments);
+                };
+                E.trigger = huelle;
+                z.haken = { E: E, orig: orig, huelle: huelle };
+            }
+
+            // Hat inzwischen jemand anders Events.trigger umhüllt, bleibt unsere Hülle als bloßer Durchgang
+            function hakenLoesen() {
+                var h = z.haken;
+                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
+                z.haken = null;
+            }
+
+            // ---------- Abspielen
+
+            function spieler(m) {
+                try { return m.getCurrentPlayer(); } catch (e) { return null; }
+            }
+
+            function zufallEin(m, p) {
+                try {
+                    if (p && p.isLocalPlayer) m.setQueueShuffleMode('Shuffle', p);
+                } catch (e) { warn('Zufall einschalten', e); }
+            }
+
+            // Fertige Einträge an Jellyfin geben; zufall: danach den Zufall der Warteschlange einschalten
+            function starten(items, zufall) {
+                if (!items.length) return;
+                var m = manager();
+                if (m) {
+                    var p = spieler(m);
+                    var fern = !!(p && !p.isLocalPlayer);
+                    Promise.resolve(m.play({ items: fern ? items.slice(0, FERN_MAX) : items, startIndex: 0 })).then(function () {
+                        if (zufall && !fern && items.length > 1) zufallEin(m, spieler(m));
+                    }).catch(function (e) { warn('Abspielen', e); });
+                    return;
+                }
+                // Manager noch unbekannt: wie ein „Play“ vom Server; den Rest hängt nachholen() an
+                var a = api(), E = ev();
+                if (!a || !E) return;
+                var erste = items.slice(0, ERSTER_TEIL);
+                z.ausstehend = {
+                    erste: erste[0].Id,
+                    anzahl: erste.length,
+                    rest: items.slice(ERSTER_TEIL),
+                    zufall: zufall,
+                    zeit: Date.now()
+                };
+                haken();
+                E.trigger(a, 'message', [{
+                    MessageType: 'Play',
+                    Data: { PlayCommand: 'PlayNow', ItemIds: erste.map(function (i) { return i.Id; }), StartIndex: 0 }
+                }]);
+            }
+
+            // Nach einem Start über die Nachricht: Rest anhängen, Zufall einschalten (bis die Warteschlange da ist)
+            function nachholen(versuch) {
+                var w = z.ausstehend, m = z.mgr;
+                if (!w || !m) return;
+                if (Date.now() - w.zeit > WARTEN_MAX) { z.ausstehend = null; return; }
+                var p = spieler(m);
+                Promise.resolve(p ? m.getPlaylist(p) : null).then(function (liste) {
+                    if (z.ausstehend !== w) return;
+                    liste = liste || [];
+                    if (!liste.length || !liste[0] || liste[0].Id !== w.erste) {
+                        // Noch die alte Warteschlange (oder eine fremde): später noch einmal
+                        if (versuch < 40) window.setTimeout(function () { nachholen(versuch + 1); }, 500);
+                        return;
+                    }
+                    z.ausstehend = null;
+                    var fern = !!(p && !p.isLocalPlayer);
+                    var rest = fern ? [] : w.rest;
+                    return Promise.resolve(rest.length ? m.queue({ items: rest }, p) : null).then(function () {
+                        if (w.zufall && !fern && liste.length + rest.length > 1) zufallEin(m, p);
+                    });
+                }).catch(function (e) { warn('Rest anhängen', e); });
+            }
+
+            function abfragen(q, zufall) {
+                var a = api();
+                if (!a) return;
+                var u;
+                try { u = a.getCurrentUserId(); } catch (e) { u = null; }
+                if (!u) return;
+                q.Recursive = true;
+                q.Limit = MAX_LIEDER;
+                q.ImageTypeLimit = 1;
+                q.ExcludeLocationTypes = 'Virtual';
+                q.EnableTotalRecordCount = false;
+                if (zufall) { q.SortBy = 'Random'; delete q.SortOrder; }
+                // Schon jetzt suchen: Läuft gleich etwas über die Nachricht an, ist die Hülle bereit
+                if (!manager()) haken();
+                Promise.resolve(a.getItems(u, q)).then(function (res) {
+                    starten((res && res.Items) || [], zufall);
+                }).catch(function (e) { warn('Lieder holen', e); });
+            }
+
+            function gespeichert(schluessel) {
+                var a = api(), u = '';
+                try { u = a ? a.getCurrentUserId() || '' : ''; } catch (e) { u = ''; }
+                if (!u) return null;
+                try { return JSON.parse(window.localStorage.getItem(u + '-' + schluessel) || 'null'); } catch (e) { return null; }
+            }
+
+            function richtung(s) {
+                return String(s || '').split(',')[0] === 'Descending' ? 'Descending' : 'Ascending';
+            }
+
+            // Sortierfelder vor Album/CD/Titel mit der Richtung des Reiters, die Titel eines Albums immer aufsteigend
+            function sortierung(vorn, ordnung) {
+                var felder = vorn ? vorn.split(',') : [];
+                var alle = felder.concat(TITEL.split(','));
+                var r = alle.map(function (f, i) { return i < Math.max(felder.length, 1) ? ordnung : 'Ascending'; });
+                return { SortBy: alle.join(','), SortOrder: r.join(',') };
+            }
+
+            function reiterAbfrage(tab, bib) {
+                var cfg = REITER[tab.id] || {};
+                var q = { ParentId: bib, IncludeItemTypes: 'Audio', MediaTypes: 'Audio' };
+                var s;
+                if (cfg.art === 'lieder') {
+                    // songs.js: Standard „Album,SortName“ aufsteigend, dazu die gespeicherten Filter
+                    s = gespeichert(bib + '-songs') || {};
+                    q.SortBy = s.SortBy || 'Album,SortName';
+                    q.SortOrder = s.SortOrder || 'Ascending';
+                    var f = gespeichert(bib + '-songs-filter') || {};
+                    Object.keys(f).forEach(function (k) {
+                        if (f[k] != null && f[k] !== '' && !(k in q)) q[k] = f[k];
+                    });
+                    return q;
+                }
+                if (cfg.art === 'alben') {
+                    // musicalbums.js: Sortieren nach Name (Standard), Album-Interpret, Jahr oder Zufall übertragen
+                    s = gespeichert(bib + '-musicalbums') || {};
+                    var by = String(s.SortBy || 'SortName'), ord = richtung(s.SortOrder);
+                    var vorn = null;
+                    if (by.indexOf('Random') === 0) vorn = 'Random';
+                    else if (by.indexOf('AlbumArtist') === 0) vorn = 'AlbumArtist';
+                    else if (by.indexOf('ProductionYear') === 0) vorn = 'ProductionYear,PremiereDate';
+                    var r = sortierung(vorn, ord);
+                    q.SortBy = r.SortBy;
+                    q.SortOrder = r.SortOrder;
+                    return q;
+                }
+                var t = sortierung(cfg.vorn, 'Ascending');
+                q.SortBy = t.SortBy;
+                q.SortOrder = t.SortOrder;
+                return q;
+            }
+
+            function reiterKlick(knopf, zufall) {
+                if (!an()) return;
+                if (!api()) {
+                    if (window.console) console.info('Werkstatt: Abspielen, kein ApiClient (Werkstatt), es wird nichts gespielt');
+                    return;
+                }
+                var tab = knopf.closest('.pageTabContent');
+                var bib = adressParameter().topParentId;
+                if (!tab || !bib) { warn('keine Bibliothek in der Adresse', window.location.hash); return; }
+                abfragen(reiterAbfrage(tab, bib), zufall);
+            }
+
+            // ---------- Knöpfe und Leisten auf den Reitern
+
+            function knopfBauen(zufall) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                if (zufall) {
+                    // Wie Jellyfins Zufallsknopf in music.html: nur das Symbol
+                    b.setAttribute('is', 'paper-icon-button-light');
+                    b.className = 'paper-icon-button-light btnShuffle autoSize ' + KNOPF + ' ' + KNOPF + '-zufall';
+                    b.title = 'Zufallswiedergabe';
+                    b.setAttribute('aria-label', 'Zufallswiedergabe');
+                    var s = document.createElement('span');
+                    s.className = 'material-icons shuffle';
+                    s.setAttribute('aria-hidden', 'true');
+                    b.appendChild(s);
+                } else {
+                    // Wie der Abspielknopf der Detailseite (itemDetails/index.html), die Schrift als eigenes Element
+                    b.setAttribute('is', 'emby-button');
+                    b.className = 'button-flat btnPlay detailButton emby-button ' + KNOPF + ' ' + KNOPF + '-alle';
+                    b.title = 'Abspielen';
+                    var c = document.createElement('div');
+                    c.className = 'detailButton-content';
+                    var i = document.createElement('span');
+                    i.className = 'material-icons detailButton-icon play_arrow';
+                    i.setAttribute('aria-hidden', 'true');
+                    c.appendChild(i);
+                    b.appendChild(c);
+                    var t = document.createElement('span');
+                    t.className = KNOPF + '-text';
+                    t.textContent = 'Abspielen';
+                    b.appendChild(t);
+                }
+                b.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    try { reiterKlick(b, zufall); } catch (x) { warn('Klick', x); }
+                });
+                return b;
+            }
+
+            // Leiste wie in music.html (div.flex…focuscontainer-x) oder wie auf Ordnerseiten (.itemsViewSettingsContainer)
+            function istLeiste(el) {
+                if (!el || el.nodeType !== 1 || el.tagName !== 'DIV' || el.querySelector('.itemsContainer')) return false;
+                return el.classList.contains('itemsViewSettingsContainer') ||
+                    (el.classList.contains('flex') && el.classList.contains('focuscontainer-x'));
+            }
+
+            // Obere Leiste des Reiters: eine fremde vor der eigenen; nur vor dem ersten Inhalt (unten steht noch eine)
+            function leisten(tab) {
+                var fremd = null, eigen = null;
+                for (var k = tab.firstElementChild; k; k = k.nextElementSibling) {
+                    if (k.classList.contains('itemsContainer') || k.classList.contains('verticalSection')) break;
+                    if (!istLeiste(k)) continue;
+                    if (k.classList.contains(LEISTE)) { if (!eigen) eigen = k; } else if (!fremd) fremd = k;
+                }
+                return { fremd: fremd, eigen: eigen };
+            }
+
+            function nurEigenes(leiste) {
+                for (var k = leiste.firstElementChild; k; k = k.nextElementSibling) {
+                    if (!k.classList.contains(KNOPF)) return false;
+                }
+                return true;
+            }
+
+            // Vor den übrigen Knöpfen: vor Jellyfins eigenen (Alben, Lieder), sonst gleich hinter .paging
+            function einsetzen(leiste, alle, zufall) {
+                var ref = leiste.querySelector(':scope > [' + ERSETZT + ']');
+                if (!ref) {
+                    for (ref = leiste.firstElementChild; ref; ref = ref.nextElementSibling) {
+                        if (!ref.classList.contains('paging') && !ref.classList.contains(KNOPF)) break;
+                    }
+                }
+                leiste.insertBefore(alle, ref);
+                leiste.insertBefore(zufall, ref);
+            }
+
+            function reiterHerstellen(tab) {
+                var l = leisten(tab);
+                var leiste = l.fremd || l.eigen;
+                if (!leiste) {
+                    leiste = document.createElement('div');
+                    leiste.className = LEISTEN_KLASSEN + ' ' + LEISTE;
+                    tab.insertBefore(leiste, tab.firstChild);
+                }
+                // Jellyfins eigene Knöpfe dieses Reiters ersetzen (bleiben im DOM, das CSS blendet sie aus)
+                Array.prototype.forEach.call(leiste.querySelectorAll(':scope > .btnPlayAll, :scope > .btnShuffle'), function (b) {
+                    if (!b.classList.contains(KNOPF) && !b.hasAttribute(ERSETZT)) b.setAttribute(ERSETZT, '');
+                });
+                var alle = tab.querySelector('.' + KNOPF + '-alle'), zufall = tab.querySelector('.' + KNOPF + '-zufall');
+                if (alle && zufall && alle.parentNode === leiste && zufall.parentNode === leiste) {
+                    // Schon da; nur eine überflüssig gewordene eigene Leiste wegräumen
+                    if (l.fremd && l.eigen && l.eigen !== leiste && nurEigenes(l.eigen)) l.eigen.parentNode.removeChild(l.eigen);
+                    return;
+                }
+                if (alle && alle.parentNode) alle.parentNode.removeChild(alle);
+                if (zufall && zufall.parentNode) zufall.parentNode.removeChild(zufall);
+                einsetzen(leiste, alle || knopfBauen(false), zufall || knopfBauen(true));
+                if (l.fremd && l.eigen && l.eigen !== leiste && nurEigenes(l.eigen)) l.eigen.parentNode.removeChild(l.eigen);
+            }
+
+            function reiterZuruecknehmen(tab) {
+                Array.prototype.forEach.call(tab.querySelectorAll('.' + KNOPF), function (b) {
+                    if (b.parentNode) b.parentNode.removeChild(b);
+                });
+                Array.prototype.forEach.call(tab.querySelectorAll('[' + ERSETZT + ']'), function (b) {
+                    b.removeAttribute(ERSETZT);
+                });
+                Array.prototype.forEach.call(tab.querySelectorAll('.' + LEISTE), function (x) {
+                    if (nurEigenes(x)) { if (x.parentNode) x.parentNode.removeChild(x); } else x.classList.remove(LEISTE);
+                });
+            }
+
+            // ---------- Detailseite
+
+            function detailId() {
+                var h = String(window.location.hash || '');
+                if (h.indexOf('details') < 0) return '';
+                return adressParameter().id || '';
+            }
+
+            function musikTyp(t) {
+                return t && (t.Type === 'MusicArtist' || t.Type === 'MusicAlbum' || t.Type === 'MusicGenre' ||
+                    (t.Type === 'Playlist' && t.MediaType !== 'Video'));
+            }
+
+            // Wiedergabelisten mit Ton markieren (Interpret, Album, Genre erkennt das CSS am Sofortmix-Knopf)
+            function detailMarkieren(ein) {
+                var id = ein ? detailId() : '';
+                Array.prototype.forEach.call(document.querySelectorAll('.itemDetailPage .mainDetailButtons'), function (k) {
+                    // Steht eine ältere Detailseite noch versteckt im DOM, stimmt dort die Id nicht; beim Klick zählt die Id
+                    var t = id ? z.typen[id] : null;
+                    var soll = t && t.Type === 'Playlist' && musikTyp(t) ? id : '';
+                    if (soll) { if (k.getAttribute(MUSIK) !== soll) k.setAttribute(MUSIK, soll); } else if (k.hasAttribute(MUSIK)) k.removeAttribute(MUSIK);
+                });
+                var a = api();
+                if (!id || !a || z.typen[id] || !document.querySelector('.itemDetailPage .mainDetailButtons')) return;
+                z.typen[id] = { laeuft: true };
+                var u;
+                try { u = a.getCurrentUserId(); } catch (e) { u = null; }
+                Promise.resolve(u && typeof a.getItem === 'function' ? a.getItem(u, id) : null).then(function (it) {
+                    z.typen[id] = it ? { Type: it.Type, MediaType: it.MediaType } : { fehlt: true };
+                    planen();
+                }, function () {
+                    z.typen[id] = { fehlt: true };
+                });
+            }
+
+            function detailAbfrage(t, id) {
+                var q = { MediaTypes: 'Audio' };
+                if (t.Type === 'MusicArtist') { q.ArtistIds = id; q.IncludeItemTypes = 'Audio'; }
+                else if (t.Type === 'MusicGenre') { q.GenreIds = id; q.IncludeItemTypes = 'Audio'; }
+                else if (t.Type === 'MusicAlbum') { q.ParentId = id; q.IncludeItemTypes = 'Audio'; }
+                else q.ParentId = id;   // Wiedergabeliste: ihre Einträge
+                return q;
+            }
+
+            function detailZufall(id) {
+                var a = api();
+                var t = z.typen[id];
+                var weiter = function (typ) {
+                    if (musikTyp(typ)) { abfragen(detailAbfrage(typ, id), true); return; }
+                    // Doch keine Musik: was Jellyfin selbst getan hätte (itemDetails, onShuffleClick)
+                    var m = manager();
+                    if (m && typ && typ.item) m.shuffle(typ.item);
+                };
+                if (t && t.Type && !t.item && musikTyp(t)) { weiter(t); return; }
+                var u;
+                try { u = a.getCurrentUserId(); } catch (e) { u = null; }
+                Promise.resolve(a.getItem(u, id)).then(function (it) {
+                    if (!it) return;
+                    z.typen[id] = { Type: it.Type, MediaType: it.MediaType };
+                    weiter({ Type: it.Type, MediaType: it.MediaType, item: it });
+                }).catch(function (e) { warn('Element holen', e); });
+            }
+
+            // Capture am document: läuft vor Jellyfins Zuhörer am Knopf (bindAll in itemDetails/index.js)
+            document.addEventListener('click', function (e) {
+                try {
+                    var b = e.target && e.target.closest ? e.target.closest('.itemDetailPage .mainDetailButtons > .btnShuffle') : null;
+                    if (!b || !an() || !api() || typeof api().getItem !== 'function') return;
+                    var k = b.parentNode, id = detailId();
+                    if (!id) return;
+                    var musik = !!k.querySelector(':scope > .btnInstantMix:not(.hide)') || k.getAttribute(MUSIK) === id;
+                    if (!musik) return;
+                    // Ohne Manager geht es nur über die Nachricht; die braucht Events
+                    if (!manager() && !ev()) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    detailZufall(id);
+                } catch (x) {
+                    warn('Zufall auf der Detailseite', x);
+                }
+            }, true);
+
+            // ---------- Beobachten
+
+            function pruefen() {
+                z.wartet = 0;
+                try {
+                    var ein = an();
+                    var page = document.getElementById(SEITE);
+                    if (page) {
+                        Object.keys(REITER).forEach(function (id) {
+                            var tab = page.querySelector('#' + id);
+                            if (!tab || !tab.classList.contains('pageTabContent')) return;
+                            if (ein) reiterHerstellen(tab); else reiterZuruecknehmen(tab);
+                        });
+                    }
+                    detailMarkieren(ein);
+                } catch (e) {
+                    warn('Prüfen', e);
+                }
+                // Die eigenen Änderungen nicht noch einmal melden lassen (sonst liefe der Observer im Kreis)
+                if (z.mo) z.mo.takeRecords();
+            }
+
+            function planen() {
+                if (!z.wartet) z.wartet = window.setTimeout(pruefen, 30);
+            }
+
+            function istStil(n) {
+                return n && (n.nodeName === 'STYLE' || n.nodeName === 'LINK');
+            }
+
+            // Betrifft eine Änderung die Musikseite, eine Detailseite oder einen Stil?
+            function wichtig(r) {
+                var t = r.target, i;
+                if (istStil(t) || t === document.head) return true;
+                for (i = 0; i < r.addedNodes.length; i++) if (istStil(r.addedNodes[i])) return true;
+                for (i = 0; i < r.removedNodes.length; i++) if (istStil(r.removedNodes[i])) return true;
+                if (!t || t.nodeType !== 1) return false;
+                if (t.closest && t.closest('#' + SEITE + ', .itemDetailPage')) return true;
+                for (i = 0; i < r.addedNodes.length; i++) {
+                    var n = r.addedNodes[i];
+                    if (n.nodeType === 1 && (n.id === SEITE || n.classList.contains('itemDetailPage') ||
+                        (n.querySelector && n.querySelector('#' + SEITE + ', .itemDetailPage')))) return true;
+                }
+                return false;
+            }
+
+            var starten0 = function () {
+                try {
+                    z.mo = new MutationObserver(function (records) {
+                        try {
+                            for (var i = 0; i < records.length; i++) {
+                                if (wichtig(records[i])) { planen(); return; }
+                            }
+                        } catch (e) { /* nichts */ }
+                    });
+                    z.mo.observe(document.documentElement, { childList: true, subtree: true });
+                    // Seitenwechsel: Jellyfin blendet Seiten aus dem Speicher nur per Klasse ein (keine Kinder ändern
+                    // sich), meldet aber viewshow; die Adresse ändert sich per pushState (kein hashchange)
+                    document.addEventListener('viewshow', planen, true);
+                    window.addEventListener('hashchange', planen);
+                } catch (e) { /* ohne Observer nur der erste Durchlauf */ }
+                planen();
+                // Manager suchen, sobald Events da ist (in der Werkstatt nach 30 s aufgeben)
+                var versuche = 0;
+                var warten = function () {
+                    try {
+                        if (manager()) return;
+                        if (ev()) { haken(); return; }
+                        if (++versuche <= 30) window.setTimeout(warten, 1000);
+                    } catch (e) { warn('Start', e); }
+                };
+                warten();
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', starten0);
+            else starten0();
+        } catch (e) {
+            if (window.console) console.warn('Werkstatt: Abspielen', e);
+        }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript musik-abspielen-zufall:", e);
+    }
+})();
