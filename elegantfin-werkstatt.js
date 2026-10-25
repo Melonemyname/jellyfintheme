@@ -6319,11 +6319,14 @@
                 });
             }
 
-            // Fläche einer Genre-Karte: wie ein Album ohne Bild, der Name auf der farbigen Ersatzfläche
+            // Fläche einer Genre-Karte: wie ein Interpret oder Album ohne Bild ein Symbol auf der Ersatzfläche.
+            // Den Namen darunter setzt der Schalter „fix-titel-statt-fragezeichen“ aus dem aria-label der Fläche
+            // (dessen Fall 2). Der reine Text (cardDefaultText, Fall 1) blieb hier bei ElegantFins „?“ und
+            // durchsichtiger Schrift hängen (gesehen am 25.10.2026), deshalb derselbe Aufbau wie beim Interpreten.
             function genreBild(g) {
                 return {
                     klasse: 'cardImageContainer ' + ersatzKlasse(g.name),
-                    inhalt: '<div class="cardText cardDefaultText">' + esc(g.name) + '</div>'
+                    inhalt: '<span class="cardImageIcon material-icons queue_music" aria-hidden="true"></span>'
                 };
             }
 
