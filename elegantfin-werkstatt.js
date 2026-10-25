@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 23.10.2026
+ * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 25.10.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
@@ -3952,6 +3952,121 @@
     })();
     } catch (e) {
         console.warn("ElegantFin-Werkstatt, Skript wiedergabe-fortsetzen:", e);
+    }
+})();
+
+// jede-runde-neu-mischen: Zufall mit „Alle wiederholen“: jede Runde neu mischen
+(function () {
+    try {
+/* Jede Runde neu mischen (ElegantFin-Werkstatt, Schalter „jede-runde-neu-mischen“). */
+(function werkstattNeuMischen() {
+        'use strict';
+        try {
+            var G = window.__werkstatt = window.__werkstatt || {};
+            if (G.neuMischen) return;
+
+            var z = {
+                mgr: null,
+                haken: null,
+                index: -1,      // Index des zuletzt gestarteten Lieds
+                kennung: '',    // sortierte PlaylistItemIds der Warteschlange dazu
+                laenge: 0
+            };
+
+            function ev() {
+                var E = window.Events;
+                return E && typeof E.trigger === 'function' && typeof E.on === 'function' && typeof E.off === 'function' ? E : null;
+            }
+
+            function warn(was, e) {
+                if (window.console) console.warn('Werkstatt: Neu mischen, ' + was, e);
+            }
+
+            function istManager(o) {
+                return !!o && typeof o === 'object' &&
+                    typeof o.getCurrentPlayer === 'function' && typeof o.getPlaylist === 'function' &&
+                    typeof o.getCurrentPlaylistIndex === 'function' && typeof o.getRepeatMode === 'function' &&
+                    typeof o.getQueueShuffleMode === 'function' && typeof o.setQueueShuffleMode === 'function';
+            }
+
+            function beiStart() {
+                var m = z.mgr, p;
+                try { p = m.getCurrentPlayer(); } catch (e) { p = null; }
+                if (!p || !p.isLocalPlayer) { z.index = -1; return; }
+                var idx;
+                try { idx = m.getCurrentPlaylistIndex(p); } catch (e) { return; }
+                Promise.resolve(m.getPlaylist(p)).then(function (liste) {
+                    liste = liste || [];
+                    var kennung = liste.map(function (i) { return i && i.PlaylistItemId ? String(i.PlaylistItemId) : ''; }).sort().join(',');
+                    var gleich = kennung === z.kennung, n = liste.length;
+                    z.index = idx;
+                    z.kennung = kennung;
+                    z.laenge = n;
+                    if (n < 3 || idx !== n - 1 || !gleich) return;
+                    if (m.getRepeatMode(p) !== 'RepeatAll' || m.getQueueShuffleMode(p) !== 'Shuffle') return;
+                    m.setQueueShuffleMode('Sorted', p);
+                    m.setQueueShuffleMode('Shuffle', p);
+                    z.index = 0;
+                }).catch(function (e) { warn('Warteschlange', e); });
+            }
+
+            function gefunden(m) {
+                if (z.mgr || !istManager(m)) return;
+                z.mgr = m;
+                if (!G.playbackManager) G.playbackManager = m;
+                hakenLoesen();
+                var E = ev();
+                if (E) E.on(m, 'playbackstart', function () {
+                    try { beiStart(); } catch (e) { warn('Start', e); }
+                });
+            }
+
+            function haken() {
+                var E = ev();
+                if (!E || z.haken || z.mgr) return;
+                var orig = E.trigger;
+                var huelle = function (obj) {
+                    if (!z.mgr) {
+                        try {
+                            if (G.playbackManager) gefunden(G.playbackManager);
+                            else if (istManager(obj)) gefunden(obj);
+                        } catch (e) { warn('Suche', e); }
+                    }
+                    return orig.apply(this, arguments);
+                };
+                E.trigger = huelle;
+                z.haken = { E: E, orig: orig, huelle: huelle };
+            }
+
+            function hakenLoesen() {
+                var h = z.haken;
+                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
+                z.haken = null;
+            }
+
+            G.neuMischen = { zustand: z };
+
+            // Nur im echten Jellyfin: auf Events warten, in der Werkstatt nach 30 s aufgeben
+            var versuche = 0;
+            var warten = function () {
+                try {
+                    if (ev()) {
+                        if (G.playbackManager) gefunden(G.playbackManager);
+                        else haken();
+                        return;
+                    }
+                    if (++versuche <= 30) window.setTimeout(warten, 1000);
+                } catch (e) {
+                    warn('Start', e);
+                }
+            };
+            warten();
+        } catch (e) {
+            if (window.console) console.warn('Werkstatt: Neu mischen', e);
+        }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript jede-runde-neu-mischen:", e);
     }
 })();
 
