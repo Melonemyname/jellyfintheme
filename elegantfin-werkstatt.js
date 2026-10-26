@@ -7153,8 +7153,8 @@
             var WIEDERHOLEN = ['RepeatNone', 'RepeatAll', 'RepeatOne'];
             var TASTEN = [
                 ['Leertaste, K', 'Abspielen / Pause'],
-                ['J, ←', 'Zurückspulen'],
-                ['L, →', 'Vorspulen'],
+                ['←', 'Zurückspulen'],
+                ['→', 'Vorspulen'],
                 ['0 … 9', 'Springen (0 bis 90 %)'],
                 ['Pos1 / Ende', 'Anfang / Ende des Lieds'],
                 ['⇧ N', 'Nächstes Lied'],
@@ -7162,6 +7162,7 @@
                 ['M', 'Stumm an/aus'],
                 ['↑ / ↓', 'Lauter / leiser (große Ansicht und Wiedergabeseite)'],
                 ['F', 'Große Ansicht auf/zu'],
+                ['L', 'Songtext auf/zu'],
                 ['Q', 'Warteschlange auf/zu'],
                 ['S', 'Zufall an/aus'],
                 ['R', 'Wiederholen: aus, alle, eins'],
@@ -7282,6 +7283,32 @@
 
             // ---------- Tasten
 
+            // Songtext: in der großen Ansicht deren Knopf (blendet die Spalte ein und aus, ohne Songtext
+            // gesperrt), sonst Jellyfins Songtext-Knopf der Musikleiste (nowPlayingBar.js: auf der
+            // Songtext-Seite zurück, sonst appRouter.show('lyrics')); fehlt der, über Emby.Page.
+            function songtext(gross) {
+                if (gross) {
+                    var tk = document.querySelector('.werkstattGross .werkstattGross-textKnopf');
+                    if (!tk || tk.disabled) return false;
+                    tk.click();
+                    return true;
+                }
+                var lk = document.querySelector('.nowPlayingBar .openLyricsButton');
+                if (lk && !lk.classList.contains('hide')) {
+                    lk.click();
+                    return true;
+                }
+                if (sichtbar('#lyricPage')) {
+                    window.history.back();
+                    return true;
+                }
+                if (window.Emby && window.Emby.Page && typeof window.Emby.Page.show === 'function') {
+                    window.Emby.Page.show('lyrics');
+                    return true;
+                }
+                return false;
+            }
+
             function befehl(e, p) {
                 var m = z.mgr, k = e.key, gross = grosseOffen();
                 var spielerSeite = gross || sichtbar('#nowPlayingPage') || sichtbar('#lyricPage');
@@ -7301,14 +7328,10 @@
                     case 'K':
                         m.playPause(p);
                         return true;
-                    case 'j':
-                    case 'J':
                     case 'ArrowLeft':
                     case 'Left':
                         m.rewind(p);
                         return true;
-                    case 'l':
-                    case 'L':
                     case 'ArrowRight':
                     case 'Right':
                         m.fastForward(p);
@@ -7338,6 +7361,9 @@
                         if (!G.grosseAnsicht) return false;
                         if (gross) G.grosseAnsicht.schliessen(); else G.grosseAnsicht.oeffnen();
                         return true;
+                    case 'l':
+                    case 'L':
+                        return songtext(gross);
                     case 'q':
                     case 'Q':
                         if (gross) G.grosseAnsicht.schliessen();
