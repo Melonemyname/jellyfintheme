@@ -114,7 +114,7 @@ Speichern, Seite neu laden.
 - Handy: Titel aus der Wiedergabeliste wischen *(Skript)*
 - Theme-Farbe und Grundfarbe pro Benutzer wählen *(Skript)*
 - Musik nach einem Neustart weiterhören *(Skript)*
-- Zufall mit „Alle wiederholen“: jede Runde neu mischen *(Skript)*
+- Hintergrund zeigt das Cover der Wiedergabe *(Skript)*
 - Desktop: Vollbild für Musik (große Ansicht) *(Skript)*
 - Bibliotheken: weniger Reiter, eigene Reihenfolge *(Skript)*
 - Serien, Reiter „Folgen“: Überschriften je Serie und Staffel *(Skript)*

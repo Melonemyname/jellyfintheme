@@ -3955,23 +3955,19 @@
     }
 })();
 
-// jede-runde-neu-mischen: Zufall mit „Alle wiederholen“: jede Runde neu mischen
+// hintergrund-cover: Hintergrund zeigt das Cover der Wiedergabe
 (function () {
     try {
-/* Jede Runde neu mischen (ElegantFin-Werkstatt, Schalter „jede-runde-neu-mischen“). */
-(function werkstattNeuMischen() {
+/* Hintergrund: Cover der Wiedergabe (ElegantFin-Werkstatt, Schalter „hintergrund-cover“). */
+(function werkstattCoverHintergrund() {
         'use strict';
         try {
             var G = window.__werkstatt = window.__werkstatt || {};
-            if (G.neuMischen) return;
+            if (G.coverHintergrund) return;
 
-            var z = {
-                mgr: null,
-                haken: null,
-                index: -1,      // Index des zuletzt gestarteten Lieds
-                kennung: '',    // sortierte PlaylistItemIds der Warteschlange dazu
-                laenge: 0
-            };
+            var KLASSE = 'werkstattCoverHintergrund';
+            var VAR = '--werkstatt-cover-bild';
+            var z = { mgr: null, haken: null, url: '' };
 
             function ev() {
                 var E = window.Events;
@@ -3979,46 +3975,71 @@
             }
 
             function warn(was, e) {
-                if (window.console) console.warn('Werkstatt: Neu mischen, ' + was, e);
+                if (window.console) console.warn('Werkstatt: Cover-Hintergrund, ' + was, e);
             }
 
             function istManager(o) {
                 return !!o && typeof o === 'object' &&
-                    typeof o.getCurrentPlayer === 'function' && typeof o.getPlaylist === 'function' &&
-                    typeof o.getCurrentPlaylistIndex === 'function' && typeof o.getRepeatMode === 'function' &&
-                    typeof o.getQueueShuffleMode === 'function' && typeof o.setQueueShuffleMode === 'function';
+                    typeof o.getCurrentPlayer === 'function' && typeof o.currentItem === 'function';
             }
 
-            function beiStart() {
-                var m = z.mgr, p;
-                try { p = m.getCurrentPlayer(); } catch (e) { p = null; }
-                if (!p || !p.isLocalPlayer) { z.index = -1; return; }
-                var idx;
-                try { idx = m.getCurrentPlaylistIndex(p); } catch (e) { return; }
-                Promise.resolve(m.getPlaylist(p)).then(function (liste) {
-                    liste = liste || [];
-                    var kennung = liste.map(function (i) { return i && i.PlaylistItemId ? String(i.PlaylistItemId) : ''; }).sort().join(',');
-                    var gleich = kennung === z.kennung, n = liste.length;
-                    z.index = idx;
-                    z.kennung = kennung;
-                    z.laenge = n;
-                    if (n < 3 || idx !== n - 1 || !gleich) return;
-                    if (m.getRepeatMode(p) !== 'RepeatAll' || m.getQueueShuffleMode(p) !== 'Shuffle') return;
-                    m.setQueueShuffleMode('Sorted', p);
-                    m.setQueueShuffleMode('Shuffle', p);
-                    z.index = 0;
-                }).catch(function (e) { warn('Warteschlange', e); });
+            // Adresse des Albumcovers (sonst des eigenen Bilds) des gerade geladenen Lieds, sonst ''
+            function coverUrl() {
+                var m = z.mgr, a = window.ApiClient;
+                if (!m || !a || typeof a.getScaledImageUrl !== 'function') return '';
+                try {
+                    var p = m.getCurrentPlayer();
+                    if (!p || !p.isLocalPlayer) return '';
+                    var it = m.currentItem(p);
+                    if (!it || it.MediaType !== 'Audio') return '';
+                    var id = null, tag = null;
+                    if (it.AlbumId && it.AlbumPrimaryImageTag) { id = it.AlbumId; tag = it.AlbumPrimaryImageTag; }
+                    else if (it.ImageTags && it.ImageTags.Primary) { id = it.Id; tag = it.ImageTags.Primary; }
+                    if (!id) return '';
+                    return a.getScaledImageUrl(id, { type: 'Primary', tag: tag, maxWidth: 1600, quality: 90 }) || '';
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            function setzen() {
+                try {
+                    var url = coverUrl(), root = document.documentElement;
+                    if (url === z.url) return;
+                    z.url = url;
+                    if (url) {
+                        root.style.setProperty(VAR, 'url("' + url.replace(/["\\\n]/g, '') + '")');
+                        root.classList.add(KLASSE);
+                    } else {
+                        root.classList.remove(KLASSE);
+                        root.style.removeProperty(VAR);
+                    }
+                } catch (e) {
+                    warn('Setzen', e);
+                }
+            }
+
+            // Beim Liedwechsel meldet Jellyfin erst Stopp und dann Start: kurz warten, sonst flackert es
+            var timer = 0;
+            function planen() {
+                window.clearTimeout(timer);
+                timer = window.setTimeout(setzen, 400);
             }
 
             function gefunden(m) {
                 if (z.mgr || !istManager(m)) return;
                 z.mgr = m;
                 if (!G.playbackManager) G.playbackManager = m;
-                hakenLoesen();
+                var h = z.haken;
+                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
+                z.haken = null;
                 var E = ev();
-                if (E) E.on(m, 'playbackstart', function () {
-                    try { beiStart(); } catch (e) { warn('Start', e); }
-                });
+                if (E) {
+                    E.on(m, 'playbackstart', planen);
+                    E.on(m, 'playbackstop', planen);
+                    E.on(m, 'playerchange', planen);
+                }
+                setzen();
             }
 
             function haken() {
@@ -4038,19 +4059,13 @@
                 z.haken = { E: E, orig: orig, huelle: huelle };
             }
 
-            function hakenLoesen() {
-                var h = z.haken;
-                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
-                z.haken = null;
-            }
-
-            G.neuMischen = { zustand: z };
+            G.coverHintergrund = { zustand: z, setzen: setzen };
 
             // Nur im echten Jellyfin: auf Events warten, in der Werkstatt nach 30 s aufgeben
             var versuche = 0;
             var warten = function () {
                 try {
-                    if (ev()) {
+                    if (ev() && window.ApiClient) {
                         if (G.playbackManager) gefunden(G.playbackManager);
                         else haken();
                         return;
@@ -4062,11 +4077,11 @@
             };
             warten();
         } catch (e) {
-            if (window.console) console.warn('Werkstatt: Neu mischen', e);
+            if (window.console) console.warn('Werkstatt: Cover-Hintergrund', e);
         }
     })();
     } catch (e) {
-        console.warn("ElegantFin-Werkstatt, Skript jede-runde-neu-mischen:", e);
+        console.warn("ElegantFin-Werkstatt, Skript hintergrund-cover:", e);
     }
 })();
 

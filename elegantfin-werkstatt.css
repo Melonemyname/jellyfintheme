@@ -3335,6 +3335,27 @@ body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortset
     margin: 0.25em;
 }
 
+/* hintergrund-cover: Hintergrund zeigt das Cover der Wiedergabe */
+/* Hintergrund: Cover der Wiedergabe (Skript des Schalters „hintergrund-cover“). Das Skript setzt
+   --werkstatt-cover-bild (url) und die Klasse werkstattCoverHintergrund an :root, solange Musik läuft.
+   Jede Hintergrundkachel von Jellyfin bekommt dann das Cover; ElegantFins ::before und ::after erben es
+   über „background: inherit“. Weich gezeichnet und etwas vergrößert, weil ein quadratisches Cover auf
+   die Fensterbreite gezogen wird. Jellyfins Wechsel der Kacheln läuft weiter, das erneute Einblenden
+   (animScaleUp) entfällt, damit dasselbe Bild nicht alle paar Sekunden zuckt.
+   Ausnahme: Detailseiten, dort gehört das Bild zum Eintrag. */
+:root.werkstattCoverHintergrund:not(:has(.itemDetailPage:not(.hide))) .backdropContainer > .backdropImage {
+    background-image: var(--werkstatt-cover-bild) !important;
+    background-position: center !important;
+    background-size: cover !important;
+    filter: blur(28px) saturate(1.15);
+    transform: scale(1.12);
+    animation: none !important;
+}
+
+:root.werkstattCoverHintergrund:not(:has(.itemDetailPage:not(.hide))) .backdropContainer {
+    overflow: hidden;
+}
+
 /* grosse-ansicht: Desktop: Vollbild für Musik (große Ansicht) */
 /* Große Ansicht für Musik am Desktop, „Vollbild“ (Skript des Schalters „grosse-ansicht“).
    Eigene Ebene im body über allem außer Jellyfins Dialogen (ab z-index 999998) und Meldungen.
