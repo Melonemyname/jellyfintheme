@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (CSS), Stand 25.10.2026
+ * ElegantFin-Werkstatt (CSS), Stand 26.10.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
@@ -687,18 +687,18 @@ div:not(.sectionTitleContainer-cards) > .sectionTitle.sectionTitle-cards {
        .cardOverlayButton-br: grün (--btnMiniPlayColor), Hover auf Karten scale(1.4)
      .btnPlay.detailButton (Detailseite): heller Pillenknopf (--btnPlayColor), dunkle Schrift,
        Hover per brightness(1.1), Symbol nur als Umriss (--fill: 0)
-   Jetzt einheitlich: grüne Fläche (ElegantFins --btnMiniPlayColor, bewusst NICHT die
-   Akzentfarbe), heller Rand, gefülltes Symbol, Schatten, beim Überfahren ein hellerer Grünton
-   und leichtes Vergrößern. Reine Symbolknöpfe sind Kreise, der beschriftete
+   Jetzt einheitlich: weiße Fläche, schwarzes gefülltes Symbol und schwarze Schrift (bis 25.10.2026
+   ElegantFins Grün --btnMiniPlayColor), Schatten, beim Überfahren ein helles Grau und leichtes
+   Vergrößern. Reine Symbolknöpfe sind Kreise, der beschriftete
    Knopf der Detailseite bleibt eine Pille. Die Größen richten sich nach dem Ort.
    --btnPlayColor bleibt unangetastet, weil ElegantFin es auch für aktive Reiter und den
    Buchstaben-Springer nutzt. Die Knöpfe im Player (.btnPause), in der Musikleiste
    (.playPauseButton) und auf der Wiedergabeseite (.btnPlayPause) fasst dieser Schalter nicht an. */
 :root {
-    --playButtonColor: var(--btnMiniPlayColor);
-    --playButtonHoverColor: rgb(52, 178, 110);
-    --playButtonBorderColor: var(--btnMiniPlayBorderColor);
-    --playButtonIconColor: #fff;
+    --playButtonColor: #fff;
+    --playButtonHoverColor: hsl(0, 0%, 86%);
+    --playButtonBorderColor: hsl(0, 0%, 80%);
+    --playButtonIconColor: #000;
     --playButtonShadow: 0 0.1em 0.45em hsla(0, 0%, 0%, 0.35);
 }
 
@@ -1611,7 +1611,7 @@ html:not(.layout-mobile) #itemDetailPage .overview-expand.emby-button:hover::aft
     color: inherit;
 }
 
-/* Grüner Abspielknopf der Detailseite: bleibt beim Überfahren grün und gleich groß */
+/* Abspielknopf der Detailseite: bleibt beim Überfahren in seiner Farbe und gleich groß */
 .layout-mobile .btnPlay.detailButton.detailButton:is(:hover, :focus):not(:active) {
     background-color: var(--playButtonColor, var(--btnMiniPlayColor));
     color: var(--playButtonIconColor, #fff);
@@ -1619,7 +1619,7 @@ html:not(.layout-mobile) #itemDetailPage .overview-expand.emby-button:hover::aft
     transform: none;
 }
 
-/* Grüne Abspielknöpfe in Listen und Folgen: ebenso */
+/* Abspielknöpfe in Listen und Folgen: ebenso */
 .layout-mobile .listItemImageButton.listItemImageButton:is(:hover, :focus):not(:active) {
     background-color: var(--playButtonColor, var(--btnMiniPlayColor)) !important;
     transform: none;
@@ -3991,6 +3991,18 @@ body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortset
 .layout-mobile #musicRecommendedPage .werkstattAbspielen-alle.btnPlay.detailButton {
     flex: 0 0 auto;
     margin-right: 0.5em !important;
+}
+
+/* Seitenzähler („1-28 von 28“) und Knöpfe: mehr Luft (Wunsch vom 26.10.2026: „der Abstand zwischen
+   0-0 von 0 und den Buttons ist mir zu klein“). Am Handy steht der Zähler in einer eigenen Zeile über
+   den Knöpfen, am Rechner links daneben. */
+#musicRecommendedPage .pageTabContent > .focuscontainer-x > .paging:not(:empty) {
+    margin-right: 1em;
+}
+
+.layout-mobile #musicRecommendedPage .pageTabContent > .focuscontainer-x > .paging:not(:empty) {
+    margin-right: 0;
+    margin-bottom: 0.75em;
 }
 
 /* Eigene Leiste auf Reitern ohne Leiste (Wiedergabelisten, Genres): kein doppelter Abstand zum Raster */

@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 25.10.2026
+ * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 26.10.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
