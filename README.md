@@ -121,6 +121,7 @@ Speichern, Seite neu laden.
 - Musik, Reiter „Lieder“ volle Breite, „Genres“ linksbündig
 - Musik, Reiter „Lieder“ und „Genres“: Ansicht wählbar, saubere Genre-Bilder *(Skript)*
 - Musik: Abspielen und Zufall auf allen Reitern und Unterseiten *(Skript)*
+- Tastenkürzel für Musik *(Skript)*
 
 ## Lizenz und Herkunft
 

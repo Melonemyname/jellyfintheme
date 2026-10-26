@@ -7138,3 +7138,296 @@
         console.warn("ElegantFin-Werkstatt, Skript musik-abspielen-zufall:", e);
     }
 })();
+
+// tastenkuerzel: Tastenkürzel für Musik
+(function () {
+    try {
+/* Tastenkürzel für Musik (ElegantFin-Werkstatt, Schalter „tastenkuerzel“). */
+(function werkstattTasten() {
+        'use strict';
+        try {
+            var G = window.__werkstatt = window.__werkstatt || {};
+            if (G.tasten) return;
+
+            var z = { mgr: null, haken: null, hilfe: null };
+            var WIEDERHOLEN = ['RepeatNone', 'RepeatAll', 'RepeatOne'];
+            var TASTEN = [
+                ['Leertaste, K', 'Abspielen / Pause'],
+                ['J, ←', 'Zurückspulen'],
+                ['L, →', 'Vorspulen'],
+                ['0 … 9', 'Springen (0 bis 90 %)'],
+                ['Pos1 / Ende', 'Anfang / Ende des Lieds'],
+                ['⇧ N', 'Nächstes Lied'],
+                ['⇧ P', 'Voriges Lied'],
+                ['M', 'Stumm an/aus'],
+                ['↑ / ↓', 'Lauter / leiser (große Ansicht und Wiedergabeseite)'],
+                ['F', 'Große Ansicht auf/zu'],
+                ['Q', 'Warteschlange auf/zu'],
+                ['S', 'Zufall an/aus'],
+                ['R', 'Wiederholen: aus, alle, eins'],
+                ['?', 'Diese Übersicht']
+            ];
+
+            function ev() {
+                var E = window.Events;
+                return E && typeof E.trigger === 'function' && typeof E.on === 'function' && typeof E.off === 'function' ? E : null;
+            }
+
+            function warn(was, e) {
+                if (window.console) console.warn('Werkstatt: Tasten, ' + was, e);
+            }
+
+            function istManager(o) {
+                return !!o && typeof o === 'object' &&
+                    typeof o.getCurrentPlayer === 'function' && typeof o.currentItem === 'function' &&
+                    typeof o.playPause === 'function' && typeof o.toggleMute === 'function' &&
+                    typeof o.nextTrack === 'function' && typeof o.seekPercent === 'function';
+            }
+
+            function gefunden(m) {
+                if (z.mgr || !istManager(m)) return;
+                z.mgr = m;
+                if (!G.playbackManager) G.playbackManager = m;
+                var h = z.haken;
+                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
+                z.haken = null;
+            }
+
+            function haken() {
+                var E = ev();
+                if (!E || z.haken || z.mgr) return;
+                var orig = E.trigger;
+                var huelle = function (obj) {
+                    if (!z.mgr) {
+                        try {
+                            if (G.playbackManager) gefunden(G.playbackManager);
+                            else if (istManager(obj)) gefunden(obj);
+                        } catch (e) { warn('Suche', e); }
+                    }
+                    return orig.apply(this, arguments);
+                };
+                E.trigger = huelle;
+                z.haken = { E: E, orig: orig, huelle: huelle };
+            }
+
+            // Läuft (oder pausiert) gerade Musik auf diesem Gerät? Dann den Player, sonst null
+            function musikPlayer() {
+                if (!z.mgr && G.playbackManager) gefunden(G.playbackManager);
+                var m = z.mgr;
+                if (!m) return null;
+                try {
+                    var p = m.getCurrentPlayer();
+                    if (!p || !p.isLocalPlayer) return null;
+                    var it = m.currentItem(p);
+                    return it && it.MediaType === 'Audio' ? p : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function sichtbar(sel) {
+                var el = document.querySelector(sel);
+                return !!el && !el.classList.contains('hide') && !el.hidden;
+            }
+
+            function grosseOffen() {
+                var g = G.grosseAnsicht;
+                return !!(g && g.zustand && g.zustand.offen);
+            }
+
+            function tippt(t) {
+                return !!(t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]'));
+            }
+
+            // ---------- Übersicht („?“)
+
+            function hilfeZu() {
+                var el = z.hilfe;
+                z.hilfe = null;
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+            }
+
+            function hilfeAuf() {
+                if (z.hilfe) { hilfeZu(); return; }
+                var el = document.createElement('div');
+                el.className = 'werkstattTastenHilfe';
+                el.setAttribute('role', 'dialog');
+                el.setAttribute('aria-label', 'Tastenkürzel');
+                var box = document.createElement('div');
+                box.className = 'werkstattTastenHilfe-box';
+                var h = document.createElement('h2');
+                h.textContent = 'Tastenkürzel Musik';
+                box.appendChild(h);
+                var tab = document.createElement('table');
+                TASTEN.forEach(function (t) {
+                    var tr = document.createElement('tr');
+                    var a = document.createElement('td');
+                    a.className = 'werkstattTastenHilfe-taste';
+                    a.textContent = t[0];
+                    var b = document.createElement('td');
+                    b.textContent = t[1];
+                    tr.appendChild(a);
+                    tr.appendChild(b);
+                    tab.appendChild(tr);
+                });
+                box.appendChild(tab);
+                var fuss = document.createElement('p');
+                fuss.textContent = 'Im Videoplayer gelten Jellyfins eigene Tasten (fast dieselben).';
+                box.appendChild(fuss);
+                el.appendChild(box);
+                el.addEventListener('click', hilfeZu);
+                document.body.appendChild(el);
+                z.hilfe = el;
+            }
+
+            // ---------- Tasten
+
+            function befehl(e, p) {
+                var m = z.mgr, k = e.key, gross = grosseOffen();
+                var spielerSeite = gross || sichtbar('#nowPlayingPage') || sichtbar('#lyricPage');
+                if (e.shiftKey) {
+                    if (k === 'N' || k === 'n') { m.nextTrack(p); return true; }
+                    if (k === 'P' || k === 'p') { m.previousTrack(p); return true; }
+                    return false;
+                }
+                switch (k) {
+                    case ' ':
+                    case 'Spacebar':
+                        if (gross) return false; // regelt die große Ansicht selbst
+                        if (e.target && e.target.closest && e.target.closest('button, a')) return false;
+                        m.playPause(p);
+                        return true;
+                    case 'k':
+                    case 'K':
+                        m.playPause(p);
+                        return true;
+                    case 'j':
+                    case 'J':
+                    case 'ArrowLeft':
+                    case 'Left':
+                        m.rewind(p);
+                        return true;
+                    case 'l':
+                    case 'L':
+                    case 'ArrowRight':
+                    case 'Right':
+                        m.fastForward(p);
+                        return true;
+                    case 'ArrowUp':
+                    case 'Up':
+                        if (!spielerSeite) return false;
+                        m.volumeUp(p);
+                        return true;
+                    case 'ArrowDown':
+                    case 'Down':
+                        if (!spielerSeite) return false;
+                        m.volumeDown(p);
+                        return true;
+                    case 'Home':
+                        m.seekPercent(0, p);
+                        return true;
+                    case 'End':
+                        m.seekPercent(100, p);
+                        return true;
+                    case 'm':
+                    case 'M':
+                        m.toggleMute(p);
+                        return true;
+                    case 'f':
+                    case 'F':
+                        if (!G.grosseAnsicht) return false;
+                        if (gross) G.grosseAnsicht.schliessen(); else G.grosseAnsicht.oeffnen();
+                        return true;
+                    case 'q':
+                    case 'Q':
+                        if (gross) G.grosseAnsicht.schliessen();
+                        if (sichtbar('#nowPlayingPage')) {
+                            window.history.back();
+                        } else if (window.Emby && window.Emby.Page && typeof window.Emby.Page.showNowPlaying === 'function') {
+                            window.Emby.Page.showNowPlaying();
+                        } else {
+                            return false;
+                        }
+                        return true;
+                    case 's':
+                    case 'S':
+                        if (typeof m.toggleQueueShuffleMode !== 'function') return false;
+                        m.toggleQueueShuffleMode(p);
+                        return true;
+                    case 'r':
+                    case 'R': {
+                        if (typeof m.setRepeatMode !== 'function') return false;
+                        var i = WIEDERHOLEN.indexOf(m.getRepeatMode(p) || 'RepeatNone');
+                        m.setRepeatMode(WIEDERHOLEN[(i + 1) % WIEDERHOLEN.length], p);
+                        return true;
+                    }
+                    default:
+                        if (/^[0-9]$/.test(k)) {
+                            m.seekPercent(parseInt(k, 10) * 10, p);
+                            return true;
+                        }
+                        return false;
+                }
+            }
+
+            function taste(e) {
+                try {
+                    if (!G.tasten.an() || e.defaultPrevented || e.repeat && !/^Arrow|^(Left|Right|Up|Down)$/.test(e.key)) return;
+                    if (e.ctrlKey || e.altKey || e.metaKey) return;
+                    if (z.hilfe) {
+                        e.preventDefault();
+                        hilfeZu();
+                        return;
+                    }
+                    if (tippt(e.target)) return;
+                    if (sichtbar('#videoOsdPage')) return; // Videoplayer: Jellyfins eigene Tasten
+                    if (document.querySelector('.dialogContainer .dialog.opened')) return;
+                    if (e.key === '?') {
+                        e.preventDefault();
+                        hilfeAuf();
+                        return;
+                    }
+                    var p = musikPlayer();
+                    if (!p) return;
+                    if (befehl(e, p)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                } catch (err) {
+                    warn('Taste', err);
+                }
+            }
+
+            G.tasten = {
+                zustand: z,
+                an: function () {
+                    try { return getComputedStyle(document.documentElement).getPropertyValue('--werkstatt-tasten').trim() === '1'; } catch (e) { return false; }
+                }
+            };
+
+            document.addEventListener('keydown', taste);
+            document.addEventListener('viewbeforeshow', hilfeZu);
+
+            // Nur im echten Jellyfin: auf Events warten, in der Werkstatt nach 30 s aufgeben
+            var versuche = 0;
+            var warten = function () {
+                try {
+                    if (ev()) {
+                        if (G.playbackManager) gefunden(G.playbackManager);
+                        else haken();
+                        return;
+                    }
+                    if (++versuche <= 30) window.setTimeout(warten, 1000);
+                } catch (e) {
+                    warn('Start', e);
+                }
+            };
+            warten();
+        } catch (e) {
+            if (window.console) console.warn('Werkstatt: Tasten', e);
+        }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript tastenkuerzel:", e);
+    }
+})();
