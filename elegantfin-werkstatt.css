@@ -4095,9 +4095,61 @@ body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortset
 
 /* sammlung-reihenfolge: Eigene Reihenfolge in Sammlungen */
 /* Eigene Reihenfolge in Sammlungen (Skript des Schalters „sammlung-reihenfolge“): diese Variable
-   schaltet das Skript ein, dazu der Dialog mit der Liste. */
+   schaltet das Skript ein, dazu das Menü „Sortieren“ und der Dialog mit der Liste. */
 :root {
     --werkstatt-sammlung-reihenfolge: 1;
+}
+
+.werkstattSortierMenue {
+    position: fixed;
+    z-index: 1000000;
+    min-width: 13em;
+    padding: 0.35em;
+    border-radius: var(--largeRadius, 1em);
+    border: var(--borderWidth, 0.06em) solid var(--borderColor, hsla(0, 0%, 100%, 0.15));
+    background: var(--drawerColor, hsl(0, 0%, 12%));
+    color: var(--textColor, #eee);
+    box-shadow: 0 0.6em 2em hsla(0, 0%, 0%, 0.5);
+}
+
+.werkstattSortierMenue button {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    width: 100%;
+    padding: 0.55em 0.8em 0.55em 0.5em;
+    border: 0;
+    border-radius: var(--smallRadius, 0.5em);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.werkstattSortierMenue button:hover,
+.werkstattSortierMenue button:focus-visible {
+    background: hsla(0, 0%, 100%, 0.1);
+    outline: none;
+}
+
+.werkstattSortierMenue .material-icons {
+    font-size: 1.25em;
+    width: 1em;
+}
+
+.werkstattSortierMenue [aria-checked="false"] .check {
+    visibility: hidden;
+}
+
+.werkstattSortierMenue [aria-checked="true"] .check {
+    color: var(--activeColor, var(--accentColor, #f97316));
+}
+
+.werkstattSortierMenue hr {
+    margin: 0.3em 0.4em;
+    border: 0;
+    border-top: var(--borderWidth, 0.06em) solid var(--borderColor, hsla(0, 0%, 100%, 0.15));
 }
 
 .werkstattSortieren {

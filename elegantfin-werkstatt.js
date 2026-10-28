@@ -7486,6 +7486,15 @@
 
             var adminCache = {};   // Benutzer-ID → Promise<bool>
             var offen = null;      // geöffneter Dialog
+            var menue = null;      // geöffnetes Sortieren-Menü
+            var SCHLUESSEL = 'werkstattSammlungSortierung';
+            var FELDER = 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount';
+            var SORTIERUNG = {
+                name: { SortBy: 'SortName', SortOrder: 'Ascending' },
+                jahr: { SortBy: 'ProductionYear,PremiereDate,SortName', SortOrder: 'Ascending' }
+            };
+            var speicherKette = Promise.resolve();
+            var geholt = {};       // Benutzer-ID → Server-Stand schon in den Zwischenspeicher geholt
 
             function warn(was, e) {
                 if (window.console) console.warn('Werkstatt: Sammlung, ' + was, e);
@@ -7517,26 +7526,151 @@
                 });
             }
 
-            // ---------- Knopf auf der Sammlungsseite
+            // ---------- Eigene Wahl je Person: Zwischenspeicher und Server
+
+            function wahlLesen(u) {
+                var m = null;
+                try { m = JSON.parse(window.localStorage.getItem(SCHLUESSEL + ':' + u) || 'null'); } catch (e) { m = null; }
+                return m && typeof m === 'object' && !Array.isArray(m) ? m : null;
+            }
+
+            function wahlSchreiben(u, m) {
+                try { window.localStorage.setItem(SCHLUESSEL + ':' + u, JSON.stringify(m || {})); } catch (e) { /* privat */ }
+            }
+
+            function serverSchreiben(a, u, m) {
+                speicherKette = speicherKette.then(function () {
+                    return a.getDisplayPreferences('usersettings', u, 'emby').then(function (prefs) {
+                        prefs = prefs || {};
+                        prefs.CustomPrefs = prefs.CustomPrefs || {};
+                        var wert = JSON.stringify(m || {});
+                        if (prefs.CustomPrefs[SCHLUESSEL] === wert) return null;
+                        prefs.CustomPrefs[SCHLUESSEL] = wert;
+                        return a.updateDisplayPreferences('usersettings', prefs, u, 'emby');
+                    });
+                }).catch(function (e) { warn('Wahl nicht gespeichert', e); });
+                return speicherKette;
+            }
+
+            // Einmal je Benutzer den Server-Stand holen (vor dem ersten Besuch einer Sammlung)
+            function serverHolen(a, u) {
+                if (!u || geholt[u]) return;
+                geholt[u] = true;
+                Promise.resolve(a.getDisplayPreferences('usersettings', u, 'emby')).then(function (prefs) {
+                    var wert = prefs && prefs.CustomPrefs ? prefs.CustomPrefs[SCHLUESSEL] : undefined;
+                    if (wert === undefined || wert === null) {
+                        var lokal = wahlLesen(u);
+                        if (lokal) serverSchreiben(a, u, lokal);
+                        return;
+                    }
+                    var m = null;
+                    try { m = JSON.parse(wert); } catch (e) { m = null; }
+                    if (m && typeof m === 'object' && !Array.isArray(m)) wahlSchreiben(u, m);
+                }).catch(function (e) { geholt[u] = false; warn('Wahl laden', e); });
+            }
+
+            function wahl(u, id) {
+                var m = wahlLesen(u);
+                var w = m && m[id];
+                return SORTIERUNG[w] ? w : '';
+            }
+
+            function waehlen(id, w) {
+                var a = api();
+                if (!a) return;
+                var u = a.getCurrentUserId();
+                var m = wahlLesen(u) || {};
+                if (SORTIERUNG[w]) m[id] = w; else delete m[id];
+                wahlSchreiben(u, m);
+                serverSchreiben(a, u, m).then(function () { window.location.reload(); });
+            }
+
+            // ---------- Hülle um getItems: nur die Kinderliste einer Sammlung (ohne SortBy, Felder FELDER)
+
+            function huelleSetzen(a) {
+                var proto = Object.getPrototypeOf(a);
+                if (!proto || proto.__werkstattSammlung || typeof proto.getItems !== 'function') return;
+                var original = proto.getItems;
+                proto.getItems = function (userId, options) {
+                    try {
+                        if (an() && options && options.ParentId && !options.SortBy && options.Fields === FELDER) {
+                            var w = wahl(userId || (this.getCurrentUserId && this.getCurrentUserId()), options.ParentId);
+                            if (w) options = Object.assign({}, options, SORTIERUNG[w]);
+                        }
+                    } catch (e) { warn('getItems', e); }
+                    return original.call(this, userId, options);
+                };
+                proto.__werkstattSammlung = true;
+            }
+
+            // ---------- Knopf „Sortieren“ auf der Sammlungsseite, mit Menü
 
             function knopfEntfernen(page) {
+                menueZu();
                 var alt = page && page.querySelector('.werkstattSammlungKnopf');
                 if (alt) alt.remove();
             }
 
-            function knopfSetzen(page, item, versuch) {
+            function menueZu() {
+                if (!menue) return;
+                document.removeEventListener('pointerdown', menue.aussen, true);
+                document.removeEventListener('keydown', menue.taste, true);
+                menue.el.remove();
+                menue = null;
+            }
+
+            function menueAuf(knopf, item, admin) {
+                if (menue) { menueZu(); return; }
+                var a = api();
+                var aktuell = a ? wahl(a.getCurrentUserId(), item.Id) : '';
+                var eintraege = [['', 'Vorgabe'], ['name', 'A–Z'], ['jahr', 'Nach Jahr']];
+                var el = document.createElement('div');
+                el.className = 'werkstattSortierMenue';
+                el.setAttribute('role', 'menu');
+                el.innerHTML = eintraege.map(function (e) {
+                    return '<button type="button" role="menuitemradio" aria-checked="' + (e[0] === aktuell) + '" data-w="' + e[0] + '">' +
+                        '<span class="material-icons check" aria-hidden="true"></span>' + esc(e[1]) + '</button>';
+                }).join('') +
+                    (admin ? '<hr><button type="button" role="menuitem" data-bearbeiten="1"><span class="material-icons swap_vert" aria-hidden="true"></span>Vorgabe bearbeiten …</button>' : '');
+                document.body.appendChild(el);
+                var b = knopf.getBoundingClientRect(), m = el.getBoundingClientRect();
+                var left = Math.min(Math.max(8, b.left), window.innerWidth - m.width - 8);
+                var top = b.bottom + 6;
+                if (top + m.height > window.innerHeight - 8) top = Math.max(8, b.top - m.height - 6);
+                el.style.left = left + 'px';
+                el.style.top = top + 'px';
+                menue = {
+                    el: el,
+                    aussen: function (e) { if (!el.contains(e.target) && !knopf.contains(e.target)) menueZu(); },
+                    taste: function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); menueZu(); } }
+                };
+                document.addEventListener('pointerdown', menue.aussen, true);
+                document.addEventListener('keydown', menue.taste, true);
+                el.addEventListener('click', function (e) {
+                    var t = e.target.closest('button');
+                    if (!t) return;
+                    menueZu();
+                    if (t.dataset.bearbeiten) { dialogOeffnen(item.Id, item.Name); return; }
+                    if (t.dataset.w !== aktuell) waehlen(item.Id, t.dataset.w);
+                });
+                var erster = el.querySelector('[aria-checked="true"]') || el.querySelector('button');
+                if (erster) erster.focus();
+            }
+
+            function knopfSetzen(page, item, admin, versuch) {
                 var leiste = page.querySelector('.mainDetailButtons');
                 if (!leiste) {
-                    if ((versuch || 0) < 20) window.setTimeout(function () { knopfSetzen(page, item, (versuch || 0) + 1); }, 250);
+                    if ((versuch || 0) < 20) window.setTimeout(function () { knopfSetzen(page, item, admin, (versuch || 0) + 1); }, 250);
                     return;
                 }
                 knopfEntfernen(page);
                 var b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'button-flat detailButton emby-button werkstattSammlungKnopf';
-                b.title = 'Reihenfolge der Sammlung ändern';
-                b.innerHTML = '<div class="detailButton-content"><span class="material-icons detailButton-icon swap_vert" aria-hidden="true"></span></div>';
-                b.addEventListener('click', function () { dialogOeffnen(item.Id, item.Name); });
+                b.title = 'Sortieren';
+                b.setAttribute('aria-haspopup', 'menu');
+                b.innerHTML = '<div class="detailButton-content"><span class="material-icons detailButton-icon sort" aria-hidden="true"></span></div>';
+                b.addEventListener('click', function () { menueAuf(b, item, admin); });
                 var mehr = leiste.querySelector('.btnMoreCommands');
                 if (mehr) leiste.insertBefore(b, mehr); else leiste.appendChild(b);
             }
@@ -7549,21 +7683,38 @@
                 var id = params.id;
                 Promise.resolve(a.getItem(a.getCurrentUserId(), id)).then(function (item) {
                     if (!item || item.Type !== 'BoxSet') return;
-                    return istAdmin(a).then(function (ok) {
+                    return istAdmin(a).then(function (admin) {
                         // inzwischen weitergeblättert?
-                        if (ok && page.isConnected && !page.classList.contains('hide')) knopfSetzen(page, item, 0);
+                        if (page.isConnected && !page.classList.contains('hide')) knopfSetzen(page, item, admin, 0);
                     });
                 }).catch(function (e) { warn('Seite', e); });
             }
 
             document.addEventListener('viewshow', function (e) {
                 try {
+                    var a = api();
+                    if (a) {
+                        huelleSetzen(a);
+                        serverHolen(a, a.getCurrentUserId());
+                    }
                     var el = e.target;
                     if (el && el.nodeType === 1 && el.id === 'itemDetailPage') {
                         pruefeSeite(el, (e.detail && e.detail.params) || null);
                     }
                 } catch (x) { warn('viewshow', x); }
             }, true);
+
+            // Hülle so früh wie möglich, damit schon die erste Sammlungsseite nach dem Start sie nutzt
+            var versuche = 0;
+            (function warten() {
+                var a = api();
+                if (a) {
+                    huelleSetzen(a);
+                    try { if (a.getCurrentUserId()) serverHolen(a, a.getCurrentUserId()); } catch (e) { /* noch nicht angemeldet */ }
+                    return;
+                }
+                if (++versuche <= 30) window.setTimeout(warten, 1000);
+            })();
 
             // ---------- Dialog
 
