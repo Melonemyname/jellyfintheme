@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (CSS), Stand 26.10.2026
+ * ElegantFin-Werkstatt (CSS), Stand 28.10.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
@@ -4091,4 +4091,193 @@ body:has(.nowPlayingBar:not(.hide):not(.nowPlayingBar-hidden)) .werkstattFortset
     margin: 0.8em 0 0;
     opacity: 0.7;
     font-size: 0.9em;
+}
+
+/* sammlung-reihenfolge: Eigene Reihenfolge in Sammlungen */
+/* Eigene Reihenfolge in Sammlungen (Skript des Schalters „sammlung-reihenfolge“): diese Variable
+   schaltet das Skript ein, dazu der Dialog mit der Liste. */
+:root {
+    --werkstatt-sammlung-reihenfolge: 1;
+}
+
+.werkstattSortieren {
+    position: fixed;
+    inset: 0;
+    z-index: 1000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    background: hsla(0, 0%, 0%, 0.55);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+.werkstattSortieren-box {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 34em;
+    max-height: 90vh;
+    box-sizing: border-box;
+    padding: 1.2em 1.2em 1em;
+    border-radius: var(--largeRadius, 1em);
+    border: var(--borderWidth, 0.06em) solid var(--borderColor, hsla(0, 0%, 100%, 0.15));
+    background: var(--drawerColor, hsl(0, 0%, 12%));
+    color: var(--textColor, #eee);
+    box-shadow: 0 1em 3em hsla(0, 0%, 0%, 0.5);
+}
+
+.werkstattSortieren-box h2 {
+    margin: 0 0 0.3em;
+    font-size: 1.2em;
+}
+
+.werkstattSortieren-hinweis,
+.werkstattSortieren-meldung {
+    margin: 0 0 0.7em;
+    opacity: 0.7;
+    font-size: 0.9em;
+}
+
+.werkstattSortieren-meldung {
+    margin: 0.6em 0 0;
+    min-height: 1.2em;
+}
+
+.werkstattSortieren-schnell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin-bottom: 0.7em;
+}
+
+.werkstattSortieren button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+.werkstattSortieren-schnell button,
+.werkstattSortieren-fuss button {
+    padding: 0.45em 0.9em;
+    border-radius: var(--smallRadius, 0.5em);
+    border: var(--borderWidth, 0.06em) solid var(--borderColor, hsla(0, 0%, 100%, 0.15));
+    background: hsla(0, 0%, 100%, 0.06);
+}
+
+.werkstattSortieren-schnell button:hover,
+.werkstattSortieren-fuss button:hover {
+    background: hsla(0, 0%, 100%, 0.12);
+}
+
+.werkstattSortieren-scroller {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--smallRadius, 0.5em);
+}
+
+.werkstattSortieren-liste {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.werkstattSortieren-zeile {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.35em 0.4em;
+    border-radius: var(--smallRadius, 0.5em);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.werkstattSortieren-zeile:nth-child(odd) {
+    background: hsla(0, 0%, 100%, 0.03);
+}
+
+.werkstattSortieren-zieht {
+    background: var(--activeColor, var(--accentColor, #f97316)) !important;
+    color: #fff;
+    box-shadow: 0 0.3em 1em hsla(0, 0%, 0%, 0.4);
+}
+
+.werkstattSortieren-griff {
+    cursor: grab;
+    touch-action: none;
+    opacity: 0.6;
+    padding: 0.2em 0;
+}
+
+.werkstattSortieren-zieht .werkstattSortieren-griff {
+    cursor: grabbing;
+    opacity: 1;
+}
+
+.werkstattSortieren-nr {
+    width: 1.6em;
+    text-align: right;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+}
+
+.werkstattSortieren-bild {
+    flex: 0 0 auto;
+    width: 2.6em;
+    height: 3.9em;
+    object-fit: cover;
+    border-radius: 0.3em;
+    background: hsla(0, 0%, 100%, 0.08);
+}
+
+.werkstattSortieren-titel {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.werkstattSortieren-titel small {
+    display: block;
+    opacity: 0.6;
+}
+
+.werkstattSortieren-pfeil {
+    flex: 0 0 auto;
+    padding: 0.15em;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1.5em;
+}
+
+.werkstattSortieren-pfeil:hover {
+    background: hsla(0, 0%, 100%, 0.1);
+}
+
+.werkstattSortieren-laedt {
+    padding: 1em;
+    opacity: 0.7;
+}
+
+.werkstattSortieren-fuss {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    margin-top: 0.6em;
+}
+
+.werkstattSortieren-fuss .werkstattSortieren-speichern {
+    background: var(--activeColor, var(--accentColor, #f97316));
+    border-color: transparent;
+    color: #fff;
+}
+
+.werkstattSortieren-fuss button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }

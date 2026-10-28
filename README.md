@@ -122,6 +122,7 @@ Speichern, Seite neu laden.
 - Musik, Reiter „Lieder“ und „Genres“: Ansicht wählbar, saubere Genre-Bilder *(Skript)*
 - Musik: Abspielen und Zufall auf allen Reitern und Unterseiten *(Skript)*
 - Tastenkürzel für Musik *(Skript)*
+- Eigene Reihenfolge in Sammlungen *(Skript)*
 
 ## Lizenz und Herkunft
 

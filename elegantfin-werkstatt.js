@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 26.10.2026
+ * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 28.10.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
@@ -7470,5 +7470,292 @@
     })();
     } catch (e) {
         console.warn("ElegantFin-Werkstatt, Skript tastenkuerzel:", e);
+    }
+})();
+
+// sammlung-reihenfolge: Eigene Reihenfolge in Sammlungen
+(function () {
+    try {
+/* Eigene Reihenfolge in Sammlungen (ElegantFin-Werkstatt, Schalter „sammlung-reihenfolge“). */
+(function werkstattSammlung() {
+        'use strict';
+        try {
+            var G = window.__werkstatt = window.__werkstatt || {};
+            if (G.sammlung) return;
+            G.sammlung = true;
+
+            var adminCache = {};   // Benutzer-ID → Promise<bool>
+            var offen = null;      // geöffneter Dialog
+
+            function warn(was, e) {
+                if (window.console) console.warn('Werkstatt: Sammlung, ' + was, e);
+            }
+
+            function an() {
+                return getComputedStyle(document.documentElement).getPropertyValue('--werkstatt-sammlung-reihenfolge').trim() === '1';
+            }
+
+            function api() {
+                var a = window.ApiClient;
+                return a && typeof a.getItem === 'function' && typeof a.getCurrentUserId === 'function' &&
+                    typeof a.ajax === 'function' && typeof a.getUrl === 'function' ? a : null;
+            }
+
+            function istAdmin(a) {
+                var u = a.getCurrentUserId();
+                if (!adminCache[u]) {
+                    adminCache[u] = Promise.resolve(a.getCurrentUser()).then(function (n) {
+                        return !!(n && n.Policy && n.Policy.IsAdministrator);
+                    }, function () { return false; });
+                }
+                return adminCache[u];
+            }
+
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+
+            // ---------- Knopf auf der Sammlungsseite
+
+            function knopfEntfernen(page) {
+                var alt = page && page.querySelector('.werkstattSammlungKnopf');
+                if (alt) alt.remove();
+            }
+
+            function knopfSetzen(page, item, versuch) {
+                var leiste = page.querySelector('.mainDetailButtons');
+                if (!leiste) {
+                    if ((versuch || 0) < 20) window.setTimeout(function () { knopfSetzen(page, item, (versuch || 0) + 1); }, 250);
+                    return;
+                }
+                knopfEntfernen(page);
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'button-flat detailButton emby-button werkstattSammlungKnopf';
+                b.title = 'Reihenfolge der Sammlung ändern';
+                b.innerHTML = '<div class="detailButton-content"><span class="material-icons detailButton-icon swap_vert" aria-hidden="true"></span></div>';
+                b.addEventListener('click', function () { dialogOeffnen(item.Id, item.Name); });
+                var mehr = leiste.querySelector('.btnMoreCommands');
+                if (mehr) leiste.insertBefore(b, mehr); else leiste.appendChild(b);
+            }
+
+            function pruefeSeite(page, params) {
+                knopfEntfernen(page);
+                if (!an() || !params || !params.id) return;
+                var a = api();
+                if (!a) return;
+                var id = params.id;
+                Promise.resolve(a.getItem(a.getCurrentUserId(), id)).then(function (item) {
+                    if (!item || item.Type !== 'BoxSet') return;
+                    return istAdmin(a).then(function (ok) {
+                        // inzwischen weitergeblättert?
+                        if (ok && page.isConnected && !page.classList.contains('hide')) knopfSetzen(page, item, 0);
+                    });
+                }).catch(function (e) { warn('Seite', e); });
+            }
+
+            document.addEventListener('viewshow', function (e) {
+                try {
+                    var el = e.target;
+                    if (el && el.nodeType === 1 && el.id === 'itemDetailPage') {
+                        pruefeSeite(el, (e.detail && e.detail.params) || null);
+                    }
+                } catch (x) { warn('viewshow', x); }
+            }, true);
+
+            // ---------- Dialog
+
+            function bildUrl(a, it) {
+                var tag = it.ImageTags && it.ImageTags.Primary;
+                if (!tag) return '';
+                return a.getUrl('Items/' + it.Id + '/Images/Primary', { maxHeight: 120, tag: tag, quality: 90 });
+            }
+
+            function zeile(a, it) {
+                var li = document.createElement('li');
+                li.className = 'werkstattSortieren-zeile';
+                li.dataset.id = it.Id;
+                li.dataset.name = it.SortName || it.Name || '';
+                li.dataset.datum = it.PremiereDate || (it.ProductionYear ? it.ProductionYear + '-01-01' : '9999');
+                var url = bildUrl(a, it);
+                li.innerHTML =
+                    '<span class="werkstattSortieren-griff material-icons drag_indicator" aria-hidden="true"></span>' +
+                    '<span class="werkstattSortieren-nr"></span>' +
+                    (url ? '<img class="werkstattSortieren-bild" loading="lazy" alt="" src="' + esc(url) + '">' : '<span class="werkstattSortieren-bild"></span>') +
+                    '<span class="werkstattSortieren-titel">' + esc(it.Name) +
+                    '<small>' + esc([it.ProductionYear, it.Type === 'Series' ? 'Serie' : ''].filter(Boolean).join(' · ')) + '</small></span>' +
+                    '<button type="button" class="werkstattSortieren-pfeil material-icons keyboard_arrow_up" title="Nach oben" data-r="-1"></button>' +
+                    '<button type="button" class="werkstattSortieren-pfeil material-icons keyboard_arrow_down" title="Nach unten" data-r="1"></button>';
+                return li;
+            }
+
+            function nummerieren(liste) {
+                Array.prototype.forEach.call(liste.children, function (li, i) {
+                    li.querySelector('.werkstattSortieren-nr').textContent = String(i + 1);
+                });
+            }
+
+            // Ziehen am Griff, mit Maus und Finger (Pointer-Events am window, kein Capture: die Zeile wandert im DOM)
+            function ziehen(liste, scroller, li, ev) {
+                ev.preventDefault();
+                li.classList.add('werkstattSortieren-zieht');
+                var timer = null, y = ev.clientY;
+                function platzieren() {
+                    var andere = liste.children;
+                    for (var i = 0; i < andere.length; i++) {
+                        var r = andere[i];
+                        if (r === li) continue;
+                        var b = r.getBoundingClientRect();
+                        if (y >= b.top && y <= b.bottom) {
+                            liste.insertBefore(li, y < b.top + b.height / 2 ? r : r.nextSibling);
+                            break;
+                        }
+                    }
+                }
+                function rollen() {
+                    var b = scroller.getBoundingClientRect();
+                    if (y < b.top + 48) scroller.scrollTop -= 14;
+                    else if (y > b.bottom - 48) scroller.scrollTop += 14;
+                    platzieren();
+                }
+                function bewegen(e) {
+                    y = e.clientY;
+                    platzieren();
+                }
+                function ende() {
+                    window.removeEventListener('pointermove', bewegen);
+                    window.removeEventListener('pointerup', ende);
+                    window.removeEventListener('pointercancel', ende);
+                    window.clearInterval(timer);
+                    li.classList.remove('werkstattSortieren-zieht');
+                    nummerieren(liste);
+                }
+                window.addEventListener('pointermove', bewegen);
+                window.addEventListener('pointerup', ende);
+                window.addEventListener('pointercancel', ende);
+                timer = window.setInterval(rollen, 30);
+            }
+
+            function sortieren(liste, art) {
+                var z = Array.prototype.slice.call(liste.children);
+                if (art === 'umdrehen') z.reverse();
+                else z.sort(function (p, q) {
+                    var x = art === 'name' ? p.dataset.name : p.dataset.datum, y = art === 'name' ? q.dataset.name : q.dataset.datum;
+                    return x.localeCompare(y, 'de', { numeric: true, sensitivity: 'base' });
+                });
+                z.forEach(function (li) { liste.appendChild(li); });
+                nummerieren(liste);
+            }
+
+            function schliessen() {
+                if (!offen) return;
+                document.removeEventListener('keydown', offen.taste, true);
+                offen.el.remove();
+                offen = null;
+            }
+
+            function dialogOeffnen(id, name) {
+                var a = api();
+                if (!a || offen) return;
+                var el = document.createElement('div');
+                el.className = 'werkstattSortieren';
+                el.innerHTML =
+                    '<div class="werkstattSortieren-box" role="dialog" aria-modal="true">' +
+                    '<h2>Reihenfolge: ' + esc(name) + '</h2>' +
+                    '<p class="werkstattSortieren-hinweis">Am Griff ziehen oder die Pfeile nutzen. Gilt für alle Benutzer.</p>' +
+                    '<div class="werkstattSortieren-schnell">' +
+                    '<button type="button" data-s="jahr">Nach Jahr</button><button type="button" data-s="name">Nach Name</button><button type="button" data-s="umdrehen">Umdrehen</button>' +
+                    '</div>' +
+                    '<div class="werkstattSortieren-scroller"><ol class="werkstattSortieren-liste"><li class="werkstattSortieren-laedt">Lädt …</li></ol></div>' +
+                    '<p class="werkstattSortieren-meldung" aria-live="polite"></p>' +
+                    '<div class="werkstattSortieren-fuss">' +
+                    '<button type="button" class="werkstattSortieren-abbrechen">Abbrechen</button>' +
+                    '<button type="button" class="werkstattSortieren-speichern" disabled>Speichern</button>' +
+                    '</div></div>';
+                document.body.appendChild(el);
+                var liste = el.querySelector('.werkstattSortieren-liste');
+                var scroller = el.querySelector('.werkstattSortieren-scroller');
+                var meldung = el.querySelector('.werkstattSortieren-meldung');
+                var speichern = el.querySelector('.werkstattSortieren-speichern');
+                var vorher = [];
+                offen = {
+                    el: el,
+                    taste: function (e) {
+                        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); schliessen(); }
+                    }
+                };
+                document.addEventListener('keydown', offen.taste, true);
+                el.addEventListener('click', function (e) { if (e.target === el) schliessen(); });
+                el.querySelector('.werkstattSortieren-abbrechen').addEventListener('click', schliessen);
+                el.querySelector('.werkstattSortieren-schnell').addEventListener('click', function (e) {
+                    var s = e.target.closest('button');
+                    if (s) sortieren(liste, s.dataset.s);
+                });
+                liste.addEventListener('click', function (e) {
+                    var p = e.target.closest('.werkstattSortieren-pfeil');
+                    if (!p) return;
+                    var li = p.closest('li');
+                    if (p.dataset.r === '-1' && li.previousElementSibling) liste.insertBefore(li, li.previousElementSibling);
+                    else if (p.dataset.r === '1' && li.nextElementSibling) liste.insertBefore(li.nextElementSibling, li);
+                    nummerieren(liste);
+                    p.focus();
+                });
+                liste.addEventListener('pointerdown', function (e) {
+                    var g = e.target.closest('.werkstattSortieren-griff');
+                    if (g && e.button === 0) ziehen(liste, scroller, g.closest('li'), e);
+                });
+
+                var u = a.getCurrentUserId();
+                Promise.resolve(a.getItems(u, { ParentId: id, Fields: 'SortName,PremiereDate,ProductionYear', EnableTotalRecordCount: false }))
+                    .then(function (r) {
+                        var items = (r && r.Items) || [];
+                        liste.innerHTML = '';
+                        items.forEach(function (it) { liste.appendChild(zeile(a, it)); vorher.push(it.Id); });
+                        nummerieren(liste);
+                        speichern.disabled = !items.length;
+                    })
+                    .catch(function (e) {
+                        warn('Laden', e);
+                        liste.innerHTML = '<li class="werkstattSortieren-laedt">Konnte die Sammlung nicht laden.</li>';
+                    });
+
+                speichern.addEventListener('click', function () {
+                    var neu = Array.prototype.map.call(liste.children, function (li) { return li.dataset.id; });
+                    speichern.disabled = true;
+                    meldung.textContent = 'Speichert …';
+                    var pfad = 'Collections/' + id + '/Items';
+                    var eintragen = function (ids) { return a.ajax({ type: 'POST', url: a.getUrl(pfad, { Ids: ids.join(',') }) }); };
+                    Promise.resolve(a.getItem(u, id))
+                        .then(function (item) {
+                            if (item.DisplayOrder === 'Default') return null;
+                            item.DisplayOrder = 'Default';
+                            return a.updateItem(item);
+                        })
+                        .then(function () { return a.ajax({ type: 'DELETE', url: a.getUrl(pfad, { Ids: vorher.join(',') }) }); })
+                        .then(function () {
+                            return eintragen(neu).catch(function (e) {
+                                warn('Eintragen, stelle alte Reihenfolge her', e);
+                                return eintragen(vorher).then(function () { throw e; });
+                            });
+                        })
+                        .then(function () {
+                            meldung.textContent = 'Gespeichert.';
+                            window.setTimeout(function () { schliessen(); window.location.reload(); }, 400);
+                        })
+                        .catch(function (e) {
+                            warn('Speichern', e);
+                            meldung.textContent = 'Speichern hat nicht geklappt, die alte Reihenfolge gilt weiter.';
+                            speichern.disabled = false;
+                        });
+                });
+            }
+        } catch (e) {
+            if (window.console) console.warn('Werkstatt: Sammlung', e);
+        }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript sammlung-reihenfolge:", e);
     }
 })();
