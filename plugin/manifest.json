@@ -8,10 +8,18 @@
     "category": "Metadata",
     "versions": [
       {
+        "version": "1.0.0.1",
+        "changelog": "Ohne Debug-Informationen gebaut, die DLL enthält keine lokalen Pfade mehr. Funktion unverändert.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/Melonemyname/jellyfintheme/27c4eb8081f915966ebc87d403081429b18afd73/plugin/dist/jellyfin-plugin-bilder_1.0.0.1.zip",
+        "checksum": "cd85b8fdbbe9dbcc6d8dc744929bca87",
+        "timestamp": "2026-10-30T11:37:47Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "Erste Fassung: Interpretenfotos von Deezer, Albumcover von Deezer und Apple.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/Melonemyname/jellyfintheme/main/plugin/dist/jellyfin-plugin-bilder_1.0.0.0.zip",
+        "sourceUrl": "https://raw.githubusercontent.com/Melonemyname/jellyfintheme/ddc947e832edc3df0e15f40eaa28e420d6652576/plugin/dist/jellyfin-plugin-bilder_1.0.0.0.zip",
         "checksum": "ec1c352a26bc27d6659404c2b5244baf",
         "timestamp": "2026-10-23T11:20:26Z"
       }
