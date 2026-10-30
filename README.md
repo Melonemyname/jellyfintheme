@@ -23,11 +23,14 @@ Dashboard → **Branding** → **Benutzerdefinierter CSS-Code**, genau diese zwe
 dieser Reihenfolge (erst ElegantFin, dann der Aufsatz):
 
 ```css
-@import url("https://cdn.jsdelivr.net/gh/lscambo13/ElegantFin@main/Theme/ElegantFin-jellyfin-theme-build-latest-minified.css");
-@import url("https://cdn.jsdelivr.net/gh/Melonemyname/jellyfintheme@main/elegantfin-werkstatt.css");
+@import url("https://cdn.jsdelivr.net/gh/lscambo13/ElegantFin@v26.09.05/Theme/ElegantFin-jellyfin-theme-build-latest-minified.css");
+@import url("https://cdn.jsdelivr.net/gh/Melonemyname/jellyfintheme@COMMIT/elegantfin-werkstatt.css");
 ```
 
-Speichern, Seite neu laden.
+`COMMIT` durch den **vollständigen** Commit-Hash dieses Repos ersetzen (40 Zeichen), also den
+Stand, den du übernehmen willst. Den jüngsten zeigt
+`git ls-remote https://github.com/Melonemyname/jellyfintheme main`, auf GitHub steht er unter
+„Commits“ (Knopf zum Kopieren neben jedem Eintrag). Speichern, Seite neu laden.
 
 ### 2. Skript (optional, empfohlen)
 
@@ -42,7 +45,7 @@ Speichern, Seite neu laden.
     if (document.getElementById(id)) return;
     var s = document.createElement('script');
     s.id = id;
-    s.src = 'https://cdn.jsdelivr.net/gh/Melonemyname/jellyfintheme@main/elegantfin-werkstatt.js';
+    s.src = 'https://cdn.jsdelivr.net/gh/Melonemyname/jellyfintheme@COMMIT/elegantfin-werkstatt.js';
     s.onerror = function () { console.warn('ElegantFin-Werkstatt: Skript ließ sich nicht laden:', s.src); };
     (document.head || document.documentElement).appendChild(s);
 })();
@@ -52,8 +55,15 @@ Speichern, Seite neu laden.
 
 ### Hinweise
 
-- jsDelivr hält `@main` bis zu zwölf Stunden im Zwischenspeicher. Wer einen festen Stand
-  will, ersetzt `@main` durch einen Commit-Hash.
+- **Warum ein fester Stand statt `@main`:** Mit `@main` lädt jeder Jellyfin-Client von selbst,
+  was gerade im Repo steht, auch Änderungen, die du nie gesehen hast. Unter einem
+  vollständigen Commit-Hash liefert jsDelivr dauerhaft dieselbe Datei aus, bei einem
+  Versions-Tag wie `v26.09.05` ebenso, sobald er einmal abgerufen wurde. Einen kurzen Hash
+  (7 Zeichen) behandelt jsDelivr dagegen wie einen Zweig.
+- **Update:** im CSS-Feld und im Lader denselben neuen Hash eintragen. CSS und Skript gehören
+  zusammen, unterschiedliche Stände passen nicht unbedingt zueinander.
+- **ElegantFin** ist auf `v26.09.05` festgelegt, die Fassung, gegen die der Aufsatz gebaut ist.
+  Eine neuere ElegantFin-Fassung kann Selektoren ändern, die der Aufsatz überschreibt.
 - Akzent- und Grundfarbe stellt jede Person selbst ein: Einstellungen → **Anzeige**, ganz
   oben „Theme-Farbe“ (braucht das Skript).
 - Die helle Fassung von ElegantFin bleibt unverändert, der Aufsatz gilt für die dunklen
