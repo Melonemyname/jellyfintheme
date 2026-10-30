@@ -20,6 +20,38 @@ ausgewählt wird, holt Jellyfin es ab.
    - URL: `https://raw.githubusercontent.com/Melonemyname/jellyfintheme/main/plugin/manifest.json`
 2. Im **Katalog** unter „Metadaten“ das Plugin **Deezer & Apple Bilder** installieren.
 3. Jellyfin **neu starten** (Dashboard → Neu starten).
+4. **Empfohlen: automatische Updates für dieses Plugin abschalten** (siehe unten).
+
+### Automatische Updates abschalten
+
+Jellyfin installiert neue Plugin-Versionen von sich aus (geplante Aufgabe „Plugins
+aktualisieren“, beim Start und alle 24 Stunden). Für ein Plugin, das aus einem einzelnen GitHub-Repo
+kommt, heißt das: Jeder Push, der eine neue Version ins Manifest schreibt, landet ungesehen auf deinem
+Server. Besser ist es, Updates bewusst von Hand zu holen.
+
+Jellyfin 10.11 hat dafür keinen Schalter im Dashboard, wohl aber einen je Plugin in dessen
+`meta.json`. Jellyfin anhalten, im Plugin-Ordner `"autoUpdate": true` auf `false` setzen,
+Jellyfin starten. Bei einer Paketinstallation unter Linux:
+
+```sh
+sudo systemctl stop jellyfin
+sudo sed -i 's/"autoUpdate": true/"autoUpdate": false/' \
+  "/var/lib/jellyfin/plugins/Deezer & Apple Bilder_"*/meta.json
+sudo systemctl start jellyfin
+```
+
+(In Docker liegt der Ordner unter `/config/plugins/`.) Nach einem Update von Hand legt
+Jellyfin einen neuen Versionsordner an, dort steht wieder `true`; dann noch einmal setzen.
+Alternativ das Repository nach der Installation wieder entfernen und nur für ein Update kurz
+eintragen.
+
+### Woher die ZIP kommt
+
+Die Download-Adresse im Manifest zeigt nicht auf `main`, sondern auf den Commit, der die ZIP
+enthält (`https://raw.githubusercontent.com/Melonemyname/jellyfintheme/<Commit>/plugin/dist/…`).
+Unter dieser Adresse liegen für immer dieselben Bytes, eine veröffentlichte Version lässt sich
+also nicht nachträglich austauschen. Jellyfin prüft die ZIP zusätzlich per MD5 (das Feld
+`checksum` kennt in Jellyfin 10.11 nur MD5).
 
 ## Wo die Bilder auftauchen
 
@@ -72,19 +104,31 @@ brew install dotnet@9
 
 Dann im Ordner `plugin/`:
 
+Für eine neue Version zuerst `<Version>`, `<AssemblyVersion>` und `<FileVersion>` in
+`src/Jellyfin.Plugin.Bilder/Jellyfin.Plugin.Bilder.csproj` hochzählen. Dann im Ordner
+`plugin/`, in dieser Reihenfolge:
+
 ```sh
-./build.sh                       # Version aus der .csproj
-./build.sh 1.0.1.0 "Was neu ist" # neue Version
+./build.sh 1.0.1.0 "Was neu ist"   # 1. bauen, ZIP packen, Eintrag in manifest.json
+git add dist/jellyfin-plugin-bilder_1.0.1.0.zip src && git commit && git push
+                                   # 2. ZIP committen und pushen, manifest.json noch nicht
+./build.sh --quelle 1.0.1.0        # 3. Download-Adresse auf den Commit aus Schritt 2 setzen
+git add manifest.json && git commit && git push
+                                   # 4. erst jetzt das Manifest
 ```
 
-Das Skript baut im Release-Modus, packt **nur** `Jellyfin.Plugin.Bilder.dll` nach
-`dist/jellyfin-plugin-bilder_<Version>.zip` (alles Übrige bringt Jellyfin mit) und trägt die
-Version samt MD5-Prüfsumme, Zeitstempel und Download-Adresse in `manifest.json` ein. Danach
-ZIP und `manifest.json` gemeinsam committen und pushen; Jellyfin sieht die neue Version im
-Katalog, sobald GitHub sie ausliefert (der Raw-Zwischenspeicher hält etwa fünf Minuten).
+Schritt 1 baut im Release-Modus ohne Debug-Informationen (`DebugType=none`, `PathMap`), damit
+keine lokalen Pfade in der DLL landen, und bricht ab, wenn doch `/Users/`, `/home/` oder `.pdb`
+darin stehen. Er packt **nur** `Jellyfin.Plugin.Bilder.dll` nach
+`dist/jellyfin-plugin-bilder_<Version>.zip` (alles Übrige bringt Jellyfin mit), mit festem
+Zeitstempel, sodass ein zweiter Lauf dieselbe ZIP ergibt. In `manifest.json` trägt er Version,
+Änderungstext, MD5 und Zeitstempel ein; die Download-Adresse enthält noch den Platzhalter
+`ZIP-NOCH-NICHT-COMMITTET`, so darf das Manifest nicht ins Repo.
 
-Für eine neue Version außerdem `<Version>` in
-`src/Jellyfin.Plugin.Bilder/Jellyfin.Plugin.Bilder.csproj` hochzählen.
+Schritt 3 sucht den Commit, der die ZIP zuletzt geändert hat, prüft, dass die ZIP dort
+byte-gleich ist und der Commit auf `origin/main` liegt, und setzt die Adresse. Jellyfin sieht
+die neue Version im Katalog, sobald GitHub das Manifest ausliefert (der Raw-Zwischenspeicher
+hält etwa fünf Minuten).
 
 ### Ausprobieren ohne Jellyfin
 
