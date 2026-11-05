@@ -1,5 +1,5 @@
 /*
- * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 28.10.2026
+ * ElegantFin-Werkstatt (Skripte für JavaScript Injector), Stand 05.11.2026
  * Aufsatz auf ElegantFin für Jellyfin 10.11, https://github.com/Melonemyname/jellyfintheme
  * Einbinden siehe README.md. Diese Datei ist gebaut, nicht von Hand ändern.
  */
@@ -7704,6 +7704,28 @@
                 } catch (x) { warn('viewshow', x); }
             }, true);
 
+            // Die Seite, die beim Laden dieses Skripts schon zu sehen ist. Nach einem Neuladen (etwa
+            // nach der Wahl im Menü, siehe waehlen) kommt das Skript über den Lader erst nach, wenn
+            // Jellyfin die Sammlungsseite schon eingeblendet hat. Dann gibt es kein viewshow mehr, und
+            // der Knopf fehlte, bis man die Seite verließ und neu öffnete (Rückmeldung 05.11.2026).
+            function aktuelleSeite(versuch) {
+                var h = window.location.hash || '';
+                if (h.indexOf('details') < 0) return;
+                var seiten = document.querySelectorAll('[id="itemDetailPage"]');
+                var page = null;
+                for (var i = 0; i < seiten.length; i++) {
+                    if (!seiten[i].classList.contains('hide')) page = seiten[i];
+                }
+                if (!page) {
+                    if (versuch < 20) window.setTimeout(function () { aktuelleSeite(versuch + 1); }, 250);
+                    return;
+                }
+                if (page.querySelector('.werkstattSammlungKnopf')) return;
+                var id = null;
+                try { id = new URLSearchParams(h.slice(h.indexOf('?') + 1)).get('id'); } catch (e) { id = null; }
+                if (id) pruefeSeite(page, { id: id });
+            }
+
             // Hülle so früh wie möglich, damit schon die erste Sammlungsseite nach dem Start sie nutzt
             var versuche = 0;
             (function warten() {
@@ -7711,6 +7733,7 @@
                 if (a) {
                     huelleSetzen(a);
                     try { if (a.getCurrentUserId()) serverHolen(a, a.getCurrentUserId()); } catch (e) { /* noch nicht angemeldet */ }
+                    aktuelleSeite(0);
                     return;
                 }
                 if (++versuche <= 30) window.setTimeout(warten, 1000);
