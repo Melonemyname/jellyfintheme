@@ -108,6 +108,7 @@ Stand, den du übernehmen willst. Den jüngsten zeigt
 - Untertitel und Tonspur im Einstellungsmenü *(Skript)*
 - Zeit rechts: Klick wechselt Restzeit und Länge *(Skript)*
 - „Wiedergabeinformationen“ aus dem Menü
+- Qualität als Auflösung statt Bitrate *(Skript)*
 - Musikleiste: Wiederholen, Zurück, Pause, Weiter, Zufall *(Skript)*
 - Wiedergabeseite: Knöpfe wie in der Musikleiste
 - Warteschlange: Cover bleibt, Titel in Akzentfarbe statt Equalizer *(Skript)*

@@ -2178,6 +2178,16 @@ html:not(.layout-mobile) #itemDetailPage .overview-expand.emby-button:hover::aft
     display: none !important;
 }
 
+/* qualitaet-aufloesung: Qualität als Auflösung statt Bitrate */
+/* Qualitätsauswahl: das Skript benennt die Einträge nach Auflösung und blendet doppelte aus */
+:root {
+    --werkstatt-qualitaet: 1;
+}
+
+.actionSheet .actionSheetMenuItem.werkstattQualitaetAus {
+    display: none !important;
+}
+
 /* musikleiste-knoepfe: Musikleiste: Wiederholen, Zurück, Pause, Weiter, Zufall */
 /* Zeitleiste höher: Jellyfin legt ihre Mitte auf die Oberkante der Leiste (top: -0.56em), der Kreis
    berührte dann das kleine Cover. Um --wsBarTrackLift höher (Wunsch: „Der Balken soll höher“). */

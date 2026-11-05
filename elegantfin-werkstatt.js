@@ -1479,6 +1479,388 @@
     }
 })();
 
+// qualitaet-aufloesung: Qualität als Auflösung statt Bitrate
+(function () {
+    try {
+(function werkstattKern() {
+        try {
+            var W = window.__werkstatt = window.__werkstatt || {};
+            if (W.kern) return;
+            var kern = W.kern = { teile: {}, wartet: 0, verschoben: {} };
+
+            // Ist das CSS eines Schalters aktiv? Es setzt dafür :root { --werkstatt-NAME: 1; }
+            kern.an = function (name) {
+                try {
+                    return getComputedStyle(document.documentElement).getPropertyValue('--werkstatt-' + name).trim() === '1';
+                } catch (e) {
+                    return false;
+                }
+            };
+
+            // Echtes Jellyfin oder Werkstatt? Jellyfin legt window.ApiClient an, sobald ein Server verbunden ist.
+            kern.jellyfin = function () {
+                return !!window.ApiClient;
+            };
+
+            kern.ausfuehren = function () {
+                kern.wartet = 0;
+                Object.keys(kern.teile).forEach(function (k) {
+                    try { kern.teile[k](); } catch (e) { /* ein Fehler in einem Teil hält die anderen nicht auf */ }
+                });
+            };
+
+            kern.planen = function () {
+                if (!kern.wartet) kern.wartet = setTimeout(kern.ausfuehren, 60);
+            };
+
+            // Element umhängen und an der alten Stelle einen Kommentar als Merker lassen
+            kern.verschieben = function (k, el, ziel, vor) {
+                if (!el || !ziel) return;
+                var alt = kern.verschoben[k];
+                if (!alt || alt.el !== el || !alt.anker.isConnected) {
+                    var anker = document.createComment('werkstatt: ' + k);
+                    el.parentNode.insertBefore(anker, el);
+                    kern.verschoben[k] = { el: el, anker: anker };
+                }
+                if (el.parentNode === ziel && (vor ? el.nextSibling === vor : !el.nextSibling)) return;
+                ziel.insertBefore(el, vor || null);
+            };
+
+            // Element an die gemerkte Stelle zurücksetzen
+            kern.zurueck = function (k) {
+                var v = kern.verschoben[k];
+                if (!v) return;
+                delete kern.verschoben[k];
+                if (v.anker.isConnected) {
+                    v.anker.parentNode.insertBefore(v.el, v.anker);
+                    v.anker.parentNode.removeChild(v.anker);
+                }
+            };
+
+            var starten = function () {
+                try {
+                    new MutationObserver(kern.planen).observe(document.documentElement, {
+                        childList: true, subtree: true, attributes: true, attributeFilter: ['class']
+                    });
+                } catch (e) { /* ohne Observer bleibt es bei den Durchläufen nach Klicks */ }
+                kern.planen();
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', starten);
+            else starten();
+        } catch (e) { /* nichts tun ist besser als Jellyfin zu stören */ }
+    })();
+(function teilQualitaet() {
+        try {
+            var W = window.__werkstatt;
+            if (!W || !W.kern || W.qualitaet) return;
+            var kern = W.kern;
+            var z = W.qualitaet = { mgr: null, haken: null };
+
+            // getVideoQualityOptions: die Bitraten der Einträge, absteigend
+            var VIDEO = [120000000, 80000000, 60000000, 40000000, 20000000, 15000000, 10000000, 8000000, 6000000, 4000000, 3000000, 1500000, 720000, 420000];
+            // ResolutionNormalizer: [Breite, höchste Bitrate als H.264]
+            var STUFEN = [[416, 365000], [640, 730000], [768, 1100000], [960, 3000000], [1280, 6000000], [1920, 13500000], [2560, 28000000], [3840, 50000000]];
+            var NAMEN = { 416: '240p', 640: '360p', 768: '432p', 960: '540p', 1280: '720p', 1920: '1080p', 2560: '1440p', 3840: '2160p' };
+            var HOEHEN = [2160, 1440, 1080, 720, 576, 540, 480, 432, 360, 240];
+            // StreamBuilder.GetMaxAudioBitrateForTotalBitrate: [Gesamt bis, Ton höchstens]
+            var TON = [[640000, 128000], [2000000, 384000], [3000000, 448000], [4000000, 640000], [5000000, 768000], [10000000, 1536000], [15000000, 2304000], [20000000, 3584000]];
+
+            // ---------- Rechnung des Servers
+
+            var faktor = function (c) {
+                c = String(c || '').toLowerCase();
+                if (c === 'h265' || c === 'hevc' || c === 'vp9') return 0.6;
+                if (c === 'av1') return 0.5;
+                return 1;
+            };
+            // EncodingHelper.ScaleBitrate
+            var skalieren = function (b, ein, aus) {
+                var f = Math.max(faktor(aus) / faktor(ein), 1);
+                if (b <= 500000) f = Math.max(f, 4);
+                else if (b <= 1000000) f = Math.max(f, 3);
+                else if (b <= 2000000) f = Math.max(f, 2.5);
+                else if (b <= 3000000) f = Math.max(f, 2);
+                else if (b >= 30000000) f = 1;
+                return Math.round(f * b);
+            };
+            // StreamBuilder.GetAudioBitrate, vereinfacht auf das, was der Browser bekommt (Stereo):
+            // Stereo in AAC oder MP3 behält seine Bitrate, sonst (5.1 abmischen, anderer Codec) 384 kbit/s
+            var tonBitrate = function (t, a) {
+                var d = 192000;
+                if (a) {
+                    var c = String(a.Codec || '').toLowerCase();
+                    d = (a.Channels || 0) <= 2 && (c === 'aac' || c === 'mp3') && a.BitRate > 0 ? a.BitRate : 384000;
+                }
+                for (var i = 0; i < TON.length; i++) {
+                    if (t <= TON[i][0]) return Math.min(d, TON[i][1]);
+                }
+                return Math.min(d, 7168000);
+            };
+            // Breite des Bildes bei Gesamtbitrate t, null = Auflösung der Quelle
+            var breite = function (t, s) {
+                var v = Math.max(t - tonBitrate(t, s.ton), 64000);
+                if (s.bitrate > 0 && v >= s.bitrate) return null;
+                var b = v;
+                if (s.bitrate > 0) {
+                    // GetMinBitrate: schwache Quellen dürfen etwas mehr bekommen
+                    var q = s.bitrate <= 2000000 ? s.bitrate * 2.5 : s.bitrate <= 3000000 ? s.bitrate * 2 : s.bitrate;
+                    b = Math.min(q, v);
+                }
+                b = Math.min(skalieren(b, s.codec, 'h264'), v);
+                var h264 = skalieren(b, 'h264', 'h264');
+                for (var i = 0; i < STUFEN.length; i++) {
+                    if (h264 <= STUFEN[i][1]) return s.breite && STUFEN[i][0] >= s.breite ? null : STUFEN[i][0];
+                }
+                return null;
+            };
+
+            // ---------- Namen
+
+            // Auflösung der Quelle: DVD als 576p (PAL) bzw. 480p, sonst die nächste übliche Höhe (Breite wie bei 16:9)
+            var quellName = function (w, h, fps) {
+                if (!w && !h) return '';
+                if (w <= 720 && h <= 576 && (w >= 700 || (w >= 640 && h > 400))) {
+                    return Math.abs(fps - 25) < 0.5 || Math.abs(fps - 50) < 1 ? '576p' : '480p';
+                }
+                var e = Math.max(h, Math.round(w * 9 / 16));
+                var best = HOEHEN[0];
+                HOEHEN.forEach(function (x) { if (Math.abs(x - e) < Math.abs(best - e)) best = x; });
+                return best + 'p';
+            };
+            var name = function (t, s) {
+                var b = breite(t, s);
+                return b ? NAMEN[b] : 'Original' + (s.name ? ' (' + s.name + ')' : '');
+            };
+            // Wie getVideoQualityOptions die Liste bildet (für den Text in der Zeile „Qualität“)
+            var angebot = function (s) {
+                var ref = s.bitrate > 0 ? s.bitrate : -1;
+                var liste = [];
+                if (ref > 0 && ref < VIDEO[0]) {
+                    var c = String(s.codec || '').toLowerCase();
+                    if ((c === 'hevc' || c === 'av1' || c === 'vp9') && ref <= 20000000) ref *= 1.5;
+                    var drueber = VIDEO.filter(function (b) { return b > ref; }).pop();
+                    if (drueber) liste.push(drueber);
+                }
+                VIDEO.forEach(function (b) { if (ref <= 0 || b <= ref) liste.push(b); });
+                return liste;
+            };
+            // getQualitySecondaryText, in Worten
+            var zeilenText = function (s) {
+                if (!s.max) return '';
+                var liste = angebot(s);
+                var gew = liste[liste.length - 1];
+                for (var i = 0; i < liste.length; i++) {
+                    if (liste[i] <= s.max) { gew = liste[i]; break; }
+                }
+                if (!s.auto) return name(gew, s);
+                return 'Auto · ' + (s.methode !== 'Transcode' ? 'Original' + (s.name ? ' (' + s.name + ')' : '') : name(gew, s));
+            };
+
+            // ---------- playbackManager finden (wie tweaks-tasten.js)
+
+            var istManager = function (o) {
+                return !!o && typeof o === 'object' && typeof o.getCurrentPlayer === 'function' &&
+                    typeof o.currentMediaSource === 'function' && typeof o.getMaxStreamingBitrate === 'function';
+            };
+            var gefunden = function (m) {
+                if (z.mgr || !istManager(m)) return;
+                z.mgr = m;
+                if (!W.playbackManager) W.playbackManager = m;
+                var h = z.haken;
+                if (h && h.E.trigger === h.huelle) h.E.trigger = h.orig;
+                z.haken = null;
+            };
+            var haken = function () {
+                var E = window.Events;
+                if (!E || typeof E.trigger !== 'function' || z.haken || z.mgr) return false;
+                var orig = E.trigger;
+                var huelle = function (obj) {
+                    if (!z.mgr) {
+                        try {
+                            if (W.playbackManager) gefunden(W.playbackManager);
+                            else if (istManager(obj)) gefunden(obj);
+                        } catch (e) { /* nichts */ }
+                    }
+                    return orig.apply(this, arguments);
+                };
+                E.trigger = huelle;
+                z.haken = { E: E, orig: orig, huelle: huelle };
+                return true;
+            };
+            if (kern.jellyfin()) {
+                var versuche = 0;
+                (function warten() {
+                    try {
+                        if (W.playbackManager) gefunden(W.playbackManager);
+                        if (z.mgr || haken()) return;
+                        if (++versuche <= 30) setTimeout(warten, 1000);
+                    } catch (e) { /* nichts */ }
+                })();
+            }
+
+            // ---------- Angaben zur laufenden Quelle
+
+            var quelle = function (dlg) {
+                var v, a, st;
+                if (!kern.jellyfin()) {
+                    // Werkstatt: „Breite,Höhe,Bitrate,Codec,fps,Ton-Codec,Kanäle,Ton-Bitrate,auto|fest,PlayMethod,MaxBitrate“
+                    var d = String(dlg.getAttribute('data-werkstatt-quelle') || '').split(',');
+                    if (d.length < 11) return null;
+                    v = { Width: +d[0], Height: +d[1], BitRate: +d[2], Codec: d[3], RealFrameRate: +d[4] };
+                    a = { Codec: d[5], Channels: +d[6], BitRate: +d[7] };
+                    st = { auto: d[8] === 'auto', methode: d[9], max: +d[10] };
+                } else {
+                    if (!z.mgr && W.playbackManager) gefunden(W.playbackManager);
+                    var m = z.mgr;
+                    if (!m) return null;
+                    var p = m.getCurrentPlayer();
+                    var ms = p && m.currentMediaSource(p);
+                    if (!ms) return null;
+                    var str = ms.MediaStreams || [];
+                    var ai = typeof m.getAudioStreamIndex === 'function' ? m.getAudioStreamIndex(p) : null;
+                    if (ai == null) ai = ms.DefaultAudioStreamIndex;
+                    str.forEach(function (x) {
+                        if (x.Type === 'Video' && !v) v = x;
+                        if (x.Type === 'Audio' && (x.Index === ai || !a)) a = x;
+                    });
+                    if (!v) return null;
+                    var ps = typeof m.getPlayerState === 'function' ? m.getPlayerState(p) : null;
+                    st = {
+                        auto: typeof m.enableAutomaticBitrateDetection === 'function' ? !!m.enableAutomaticBitrateDetection(p) : true,
+                        methode: ps && ps.PlayState ? ps.PlayState.PlayMethod : '',
+                        max: m.getMaxStreamingBitrate(p)
+                    };
+                }
+                var fps = v.RealFrameRate || v.AverageFrameRate || 0;
+                return {
+                    breite: v.Width || 0, bitrate: v.BitRate || 0, codec: v.Codec, ton: a || null,
+                    name: quellName(v.Width || 0, v.Height || 0, fps),
+                    auto: st.auto, methode: st.methode, max: st.max
+                };
+            };
+
+            // ---------- Menüs
+
+            var merken = function (el, text) {
+                if (!el.hasAttribute('data-werkstatt-text')) el.setAttribute('data-werkstatt-text', el.textContent);
+                if (el.textContent !== text) el.textContent = text;
+            };
+
+            var zuruecksetzen = function () {
+                document.querySelectorAll('[data-werkstatt-text]').forEach(function (el) {
+                    el.textContent = el.getAttribute('data-werkstatt-text');
+                    el.removeAttribute('data-werkstatt-text');
+                });
+                document.querySelectorAll('.werkstattQualitaetAus').forEach(function (b) { b.classList.remove('werkstattQualitaetAus'); });
+                document.querySelectorAll('[data-werkstatt-qualitaet]').forEach(function (d) { d.removeAttribute('data-werkstatt-qualitaet'); });
+            };
+
+            // Nur Jellyfins Video-Qualität: ohne Überschrift, „Auto“ (0) und sonst nur Bitraten aus VIDEO
+            var istQualitaet = function (dlg) {
+                if (dlg.querySelector('.actionSheetTitle')) return false;
+                var auto = false, rest = 0;
+                var items = dlg.querySelectorAll('.actionSheetMenuItem');
+                for (var i = 0; i < items.length; i++) {
+                    var id = items[i].getAttribute('data-id');
+                    if (id === '0') auto = true;
+                    else if (VIDEO.indexOf(Number(id)) >= 0) rest++;
+                    else return false;
+                }
+                return auto && rest > 0;
+            };
+
+            var playerOffen = function () {
+                var seiten = document.querySelectorAll('#videoOsdPage');
+                for (var i = 0; i < seiten.length; i++) {
+                    if (!seiten[i].classList.contains('hide')) return seiten[i];
+                }
+                return null;
+            };
+
+            var umschreiben = function (dlg, s) {
+                var gruppen = {};
+                dlg.querySelectorAll('.actionSheetMenuItem').forEach(function (b) {
+                    var id = Number(b.getAttribute('data-id'));
+                    var text = b.querySelector('.actionSheetItemText');
+                    if (!id || !text) return;
+                    var n = name(id, s);
+                    merken(text, n);
+                    var icon = b.querySelector('.actionsheetMenuItemIcon');
+                    var x = { b: b, gewaehlt: !!icon && icon.style.visibility !== 'hidden' };
+                    var g = gruppen[n];
+                    if (!g) {
+                        gruppen[n] = x;
+                        return;
+                    }
+                    // Je Auflösung ein Eintrag: der gewählte, sonst der erste (höchste Bitrate)
+                    var weg = x.gewaehlt && !g.gewaehlt ? g : x;
+                    weg.b.classList.add('werkstattQualitaetAus');
+                    if (weg === g) gruppen[n] = x;
+                });
+            };
+
+            // Jellyfin hat das Menü vor dem Ausblenden am Zahnrad ausgerichtet (actionSheet getPosition): neu rechnen
+            var platzieren = function (dlg, seite) {
+                if (document.documentElement.classList.contains('layout-mobile')) return;
+                if (!kern.jellyfin()) {
+                    try { window.dispatchEvent(new Event('resize')); } catch (e) { /* nichts */ }
+                    return;
+                }
+                if (dlg.style.position !== 'fixed') return;
+                var knopf = seite.querySelector('.videoOsdBottom .btnVideoOsdSettings');
+                var r = knopf && knopf.getBoundingClientRect();
+                if (!r || !r.width) return;
+                var h = dlg.offsetHeight || 300, w = dlg.offsetWidth || 160;
+                var top = r.top + r.height / 2 - h / 2, left = r.left + r.width / 2 - w / 2;
+                var ox = left + w - window.innerWidth, oy = top + h - window.innerHeight;
+                if (ox > 0) left -= ox + 20;
+                if (oy > 0) top -= oy + 20;
+                dlg.style.left = Math.max(left, 10) + 'px';
+                dlg.style.top = Math.max(top, 10) + 'px';
+            };
+
+            var bearbeiten = function () {
+                if (!kern.an('qualitaet')) {
+                    if (document.querySelector('[data-werkstatt-text], [data-werkstatt-qualitaet]')) zuruecksetzen();
+                    return;
+                }
+                var seite = playerOffen();
+                if (!seite) return;
+                document.querySelectorAll('.actionSheet').forEach(function (dlg) {
+                    if (dlg.hasAttribute('data-werkstatt-qualitaet')) return;
+                    var zeile = dlg.querySelector('.actionSheetMenuItem[data-id="quality"]');
+                    if (!zeile && !istQualitaet(dlg)) return;
+                    // Ohne Angaben zur Quelle bleibt das Menü, wie es ist (beim nächsten Durchlauf neuer Versuch)
+                    var s = quelle(dlg);
+                    if (!s) return;
+                    dlg.setAttribute('data-werkstatt-qualitaet', '1');
+                    if (zeile) {
+                        var neben = zeile.querySelector('.actionSheetItemAsideText');
+                        var t = neben && zeilenText(s);
+                        if (t) merken(neben, t);
+                        return;
+                    }
+                    umschreiben(dlg, s);
+                    platzieren(dlg, seite);
+                });
+            };
+
+            kern.teile.qualitaet = bearbeiten;
+            // Zusätzlich sofort, wenn ein Dialog in den body kommt: so blitzen die Bitraten nicht erst auf
+            try {
+                new MutationObserver(function () {
+                    try { bearbeiten(); } catch (e) { /* nichts */ }
+                }).observe(document.body, { childList: true });
+            } catch (e) { /* nichts */ }
+            z.rechnen = { name: name, quellName: quellName, zeilenText: zeilenText, angebot: angebot };
+            kern.planen();
+        } catch (e) { /* nichts */ }
+    })();
+    } catch (e) {
+        console.warn("ElegantFin-Werkstatt, Skript qualitaet-aufloesung:", e);
+    }
+})();
+
 // musikleiste-knoepfe: Musikleiste: Wiederholen, Zurück, Pause, Weiter, Zufall
 (function () {
     try {
